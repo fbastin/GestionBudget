@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+backend/finance.db
+
+# Excel and sensitive data
+*.xlsx
+*.xls
+msg.txt
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Vite
+frontend/dist/
+frontend/node_modules/
