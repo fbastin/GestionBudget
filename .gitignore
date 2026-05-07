@@ -12,6 +12,9 @@ backend/finance.db
 *.xlsx
 *.xls
 msg.txt
+backend/migrate_excel.py
+backend/reset_db.py
+backend/init_credits.py
 
 # Node
 node_modules/
