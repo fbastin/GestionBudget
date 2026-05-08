@@ -50,6 +50,7 @@ class AssetBase(BaseModel):
     type: str
     location: Optional[str] = None
     details: Optional[dict] = None
+    bank_id: Optional[int] = None
 
 class AssetCreate(AssetBase):
     pass
@@ -59,10 +60,33 @@ class AssetUpdate(BaseModel):
     type: Optional[str] = None
     location: Optional[str] = None
     details: Optional[dict] = None
+    bank_id: Optional[int] = None
 
 class Asset(AssetBase):
     id: int
     snapshots: List[SnapshotBase] = []
+    investments: List['Investment'] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class InvestmentBase(BaseModel):
+    symbol: str
+    quantity: float
+    average_cost: float
+    current_price: Optional[float] = None
+    asset_id: int
+
+class InvestmentCreate(InvestmentBase):
+    pass
+
+class InvestmentUpdate(BaseModel):
+    symbol: Optional[str] = None
+    quantity: Optional[float] = None
+    average_cost: Optional[float] = None
+    current_price: Optional[float] = None
+    asset_id: Optional[int] = None
+
+class Investment(InvestmentBase):
+    id: int
     model_config = ConfigDict(from_attributes=True)
 
 class StockBase(BaseModel):

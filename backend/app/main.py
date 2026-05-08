@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Response
+from fastapi import FastAPI, Depends, HTTPException, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
@@ -12,7 +12,7 @@ app = FastAPI(title='Finance Manager API')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -28,16 +28,59 @@ def get_assets(db: Session = Depends(database.get_db)):
     assets = db.query(models.Asset).all()
     result = []
     for a in assets:
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == a.id).order_by(models.Snapshot.date.asc()).all()
+        snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == a.id).order_by(models.Snapshot.date.asc(), models.Snapshot.id.asc()).all()
+        investments = db.query(models.Investment).filter(models.Investment.asset_id == a.id).all()
         result.append({
             'id': a.id,
             'name': a.name,
             'type': a.type,
             'location': a.location,
             'details': a.details,
-            'snapshots': [{'date': str(s.date), 'amount': float(s.amount)} for s in snapshots]
+            'bank_id': a.bank_id,
+            'snapshots': [{'id': s.id, 'date': str(s.date), 'amount': float(s.amount)} for s in snapshots],
+            'investments': [{
+                'id': i.id,
+                'symbol': i.symbol,
+                'quantity': i.quantity,
+                'average_cost': i.average_cost,
+                'current_price': i.current_price,
+                'asset_id': i.asset_id
+            } for i in investments]
         })
     return result
+
+@app.get('/investments', response_model=List[schemas.Investment])
+def get_investments(db: Session = Depends(database.get_db)):
+    return db.query(models.Investment).all()
+
+@app.post('/investments', response_model=schemas.Investment)
+def create_investment(investment: schemas.InvestmentCreate, db: Session = Depends(database.get_db)):
+    db_investment = models.Investment(**investment.dict())
+    db.add(db_investment)
+    db.commit()
+    db.refresh(db_investment)
+    return db_investment
+
+@app.patch('/investments/{investment_id}', response_model=schemas.Investment)
+def update_investment(investment_id: int, investment_update: schemas.InvestmentUpdate, db: Session = Depends(database.get_db)):
+    db_investment = db.query(models.Investment).filter(models.Investment.id == investment_id).first()
+    if not db_investment:
+        raise HTTPException(status_code=404, detail='Investment not found')
+    update_data = investment_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_investment, key, value)
+    db.commit()
+    db.refresh(db_investment)
+    return db_investment
+
+@app.delete('/investments/{investment_id}')
+def delete_investment(investment_id: int, db: Session = Depends(database.get_db)):
+    db_investment = db.query(models.Investment).filter(models.Investment.id == investment_id).first()
+    if not db_investment:
+        raise HTTPException(status_code=404, detail='Investment not found')
+    db.delete(db_investment)
+    db.commit()
+    return {'message': 'Investment deleted'}
 
 @app.post('/assets', response_model=schemas.Asset)
 def create_asset(asset: schemas.AssetCreate, db: Session = Depends(database.get_db)):
@@ -52,9 +95,14 @@ def update_asset(asset_id: int, asset_update: schemas.AssetUpdate, db: Session =
     db_asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
     if not db_asset:
         raise HTTPException(status_code=404, detail='Asset not found')
-    for var, value in vars(asset_update).items():
-        if value is not None:
-            setattr(db_asset, var, value)
+    update_data = asset_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        if key == 'details' and db_asset.details and value:
+            merged_details = dict(db_asset.details)
+            merged_details.update(value)
+            setattr(db_asset, key, merged_details)
+        else:
+            setattr(db_asset, key, value)
     db.commit()
     db.refresh(db_asset)
     return db_asset
@@ -73,12 +121,12 @@ def get_liabilities(db: Session = Depends(database.get_db)):
     liabilities = db.query(models.Liability).all()
     result = []
     for l in liabilities:
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == l.id).order_by(models.Snapshot.date.asc()).all()
+        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == l.id).order_by(models.Snapshot.date.asc(), models.Snapshot.id.asc()).all()
         result.append({
             'id': l.id,
             'name': l.name,
             'type': l.type,
-            'snapshots': [{'date': str(s.date), 'amount': float(s.amount)} for s in snapshots]
+            'snapshots': [{'id': s.id, 'date': str(s.date), 'amount': float(s.amount)} for s in snapshots]
         })
     return result
 
@@ -95,9 +143,9 @@ def update_liability(liability_id: int, liability_update: schemas.LiabilityUpdat
     db_liability = db.query(models.Liability).filter(models.Liability.id == liability_id).first()
     if not db_liability:
         raise HTTPException(status_code=404, detail='Liability not found')
-    for var, value in vars(liability_update).items():
-        if value is not None:
-            setattr(db_liability, var, value)
+    update_data = liability_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_liability, key, value)
     db.commit()
     db.refresh(db_liability)
     return db_liability
@@ -113,11 +161,33 @@ def delete_liability(liability_id: int, db: Session = Depends(database.get_db)):
 
 @app.post('/snapshots', response_model=schemas.SnapshotBase)
 def create_snapshot(snapshot: schemas.SnapshotCreate, db: Session = Depends(database.get_db)):
+    # Check if a snapshot already exists for this item on this date
+    existing = None
+    if snapshot.asset_id:
+        existing = db.query(models.Snapshot).filter(models.Snapshot.asset_id == snapshot.asset_id, models.Snapshot.date == snapshot.date).first()
+    elif snapshot.liability_id:
+        existing = db.query(models.Snapshot).filter(models.Snapshot.liability_id == snapshot.liability_id, models.Snapshot.date == snapshot.date).first()
+    
+    if existing:
+        existing.amount = snapshot.amount
+        db.commit()
+        db.refresh(existing)
+        return existing
+    
     db_snapshot = models.Snapshot(**snapshot.dict())
     db.add(db_snapshot)
     db.commit()
     db.refresh(db_snapshot)
     return db_snapshot
+
+@app.delete('/snapshots/{snapshot_id}')
+def delete_snapshot(snapshot_id: int, db: Session = Depends(database.get_db)):
+    db_snapshot = db.query(models.Snapshot).filter(models.Snapshot.id == snapshot_id).first()
+    if not db_snapshot:
+        raise HTTPException(status_code=404, detail='Snapshot not found')
+    db.delete(db_snapshot)
+    db.commit()
+    return {'message': 'Snapshot deleted'}
 
 @app.get('/banks', response_model=List[schemas.Bank])
 def get_banks(db: Session = Depends(database.get_db)):
@@ -136,9 +206,9 @@ def update_bank(bank_id: int, bank_update: schemas.BankUpdate, db: Session = Dep
     db_bank = db.query(models.Bank).filter(models.Bank.id == bank_id).first()
     if not db_bank:
         raise HTTPException(status_code=404, detail='Bank not found')
-    for var, value in vars(bank_update).items():
-        if value is not None:
-            setattr(db_bank, var, value)
+    update_data = bank_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_bank, key, value)
     db.commit()
     db.refresh(db_bank)
     return db_bank
@@ -169,9 +239,9 @@ def update_credit(credit_id: int, credit_update: schemas.CreditUpdate, db: Sessi
     db_credit = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
     if not db_credit:
         raise HTTPException(status_code=404, detail='Credit not found')
-    for var, value in vars(credit_update).items():
-        if value is not None:
-            setattr(db_credit, var, value)
+    update_data = credit_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_credit, key, value)
     db.commit()
     db.refresh(db_credit)
     return db_credit
@@ -202,9 +272,9 @@ def update_contribution(contribution_id: int, contribution_update: schemas.Contr
     db_contribution = db.query(models.Contribution).filter(models.Contribution.id == contribution_id).first()
     if not db_contribution:
         raise HTTPException(status_code=404, detail='Contribution not found')
-    for var, value in vars(contribution_update).items():
-        if value is not None:
-            setattr(db_contribution, var, value)
+    update_data = contribution_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_contribution, key, value)
     db.commit()
     db.refresh(db_contribution)
     return db_contribution
@@ -289,6 +359,57 @@ def export_csv(db: Session = Depends(database.get_db)):
     for a in assets:
         latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == a.id).order_by(models.Snapshot.date.desc()).first()
         amount = latest.amount if latest else (a.details.get('value', 0) if a.details else 0)
-        writer.writerow(['Asset', a.name, amount, latest.date if latest else ''])
+        date = latest.date if latest else ''
+        writer.writerow(['Asset', a.name, amount, date])
         
     return Response(content=output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename=budget_export.csv'})
+
+@app.post('/import/csv')
+async def import_csv(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    input_file = io.StringIO(decoded)
+    reader = csv.DictReader(input_file)
+    
+    count = 0
+    for row in reader:
+        category = row.get('Category')
+        name = row.get('Name')
+        amount = row.get('Amount')
+        date_str = row.get('Date')
+        
+        if not category or not name or not amount:
+            continue
+            
+        try:
+            amount_val = float(amount)
+            if date_str:
+                date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
+            else:
+                date_val = datetime.now().date()
+        except ValueError:
+            continue
+            
+        if category.lower() == 'asset':
+            asset = db.query(models.Asset).filter(models.Asset.name == name).first()
+            if asset:
+                # Check if snapshot already exists for this date
+                existing = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == date_val).first()
+                if existing:
+                    existing.amount = amount_val
+                else:
+                    db.add(models.Snapshot(asset_id=asset.id, amount=amount_val, date=date_val))
+                count += 1
+        elif category.lower() == 'liability':
+            liability = db.query(models.Liability).filter(models.Liability.name == name).first()
+            if liability:
+                existing = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability.id, models.Snapshot.date == date_val).first()
+                if existing:
+                    existing.amount = amount_val
+                else:
+                    db.add(models.Snapshot(liability_id=liability.id, amount=amount_val, date=date_val))
+                count += 1
+                
+    db.commit()
+    return {'message': f'{count} snapshots imported successfully'}
+

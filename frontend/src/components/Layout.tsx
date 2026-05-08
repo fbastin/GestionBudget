@@ -6,6 +6,7 @@ export function Layout() {
 
   const menuItems = [
     { path: "/", label: "Actifs/Passifs", icon: <LayoutDashboard size={20} /> },
+    { path: "/investissements", label: "Investissements", icon: <TrendingUp size={20} /> },
     { path: "/banques", label: "Banques", icon: <Building2 size={20} /> },
     { path: "/credits", label: "Crédits", icon: <CreditCard size={20} /> },
     { path: "/celi", label: "CELI", icon: <TrendingUp size={20} /> },

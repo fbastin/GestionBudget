@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities } from "../api";
-import { CreditCard, Plus, Trash2, Save, X, Link as LinkIcon, Info } from "lucide-react";
+import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities, addSnapshot, deleteSnapshot } from "../api";
+import { CreditCard, Plus, Trash2, Save, X, Link as LinkIcon, Info, Edit2, History as HistoryIcon } from "lucide-react";
 
 interface Snapshot {
+  id: number;
   date: string;
   amount: number;
 }
@@ -33,6 +34,7 @@ export function Credits() {
   const [newLimit, setNewLimit] = useState("");
   const [newRate, setNewRate] = useState("");
   const [newLiabilityId, setNewLiabilityId] = useState<string>("");
+  const [newItemAmount, setNewItemAmount] = useState("");
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -40,14 +42,29 @@ export function Credits() {
   const [editLimit, setEditLimit] = useState("");
   const [editRate, setEditRate] = useState("");
   const [editLiabilityId, setEditLiabilityId] = useState<string>("");
+  const [editAmount, setEditAmount] = useState("");
+
+  const [showHistoryFor, setShowHistoryFor] = useState<number | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refreshData = async () => {
-    const [creditsRes, liabilitiesRes] = await Promise.all([
-      getCredits(),
-      getLiabilities()
-    ]);
-    setCredits(creditsRes.data);
-    setLiabilities(liabilitiesRes.data);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [creditsRes, liabilitiesRes] = await Promise.all([
+        getCredits(),
+        getLiabilities()
+      ]);
+      setCredits(creditsRes.data);
+      setLiabilities(liabilitiesRes.data);
+    } catch (err) {
+      console.error("Failed to fetch credits:", err);
+      setError("Erreur de chargement des crédits.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -57,19 +74,29 @@ export function Credits() {
   const handleAdd = async () => {
     if (!newName || !newType) return;
     try {
-      await createCredit({
+      const res = await createCredit({
         name: newName,
         type: newType,
         limit: parseFloat(newLimit) || null,
         interest_rate: parseFloat(newRate) || null,
         liability_id: newLiabilityId ? parseInt(newLiabilityId) : null,
       });
+      
+      if (newItemAmount && res.data.liability_id) {
+        await addSnapshot({
+          liability_id: res.data.liability_id,
+          amount: parseFloat(newItemAmount),
+          date: new Date().toISOString().split("T")[0],
+        });
+      }
+
       setIsAdding(false);
       setNewName("");
       setNewType("");
       setNewLimit("");
       setNewRate("");
       setNewLiabilityId("");
+      setNewItemAmount("");
       refreshData();
     } catch (err) {
       alert("Erreur lors de l'ajout du crédit");
@@ -78,6 +105,7 @@ export function Credits() {
 
   const handleUpdate = async (id: number) => {
     try {
+      const credit = credits.find(c => c.id === id);
       await updateCredit(id, {
         name: editName,
         type: editType,
@@ -85,10 +113,29 @@ export function Credits() {
         interest_rate: parseFloat(editRate) || null,
         liability_id: editLiabilityId ? parseInt(editLiabilityId) : null,
       });
+
+      if (editAmount !== "" && credit?.liability_id) {
+        await addSnapshot({
+          liability_id: credit.liability_id,
+          amount: parseFloat(editAmount),
+          date: new Date().toISOString().split("T")[0],
+        });
+      }
+
       setEditingId(null);
       refreshData();
     } catch (err) {
       alert("Erreur lors de la mise à jour");
+    }
+  };
+
+  const handleDeleteSnapshot = async (sid: number) => {
+    if (!window.confirm("Supprimer ce relevé historique ?")) return;
+    try {
+      await deleteSnapshot(sid);
+      refreshData();
+    } catch (err) {
+      alert("Erreur lors de la suppression du relevé");
     }
   };
 
@@ -103,11 +150,26 @@ export function Credits() {
   };
 
   const totalBalance = credits.reduce((sum, c) => {
-    const amount = c.liability?.snapshots?.[c.liability.snapshots.length - 1]?.amount || 0;
+    const snapshots = c.liability?.snapshots || [];
+    const sorted = [...snapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+    const amount = sorted[sorted.length - 1]?.amount || 0;
     return sum + amount;
   }, 0);
 
   const totalLimit = credits.reduce((sum, c) => sum + (c.limit || 0), 0);
+
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement...</div>;
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="bg-rose-50 text-rose-600 p-4 rounded-xl border border-rose-200 inline-block">
+          <p className="font-bold mb-2">{error}</p>
+          <button onClick={refreshData} className="text-sm underline font-bold">Réessayer</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 font-sans text-slate-900">
@@ -119,7 +181,15 @@ export function Credits() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestion des Crédits</h1>
         </div>
         <button
-          onClick={() => setIsAdding(true)}
+          onClick={() => {
+            setIsAdding(true);
+            setNewName("");
+            setNewType("");
+            setNewLimit("");
+            setNewRate("");
+            setNewLiabilityId("");
+            setNewItemAmount("");
+          }}
           className="flex items-center gap-2 bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition-all shadow-sm active:scale-95"
         >
           <Plus size={18} />
@@ -160,6 +230,8 @@ export function Credits() {
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                autoFocus
                 placeholder="ex: Visa"
               />
             </div>
@@ -170,6 +242,7 @@ export function Credits() {
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
                 value={newType}
                 onChange={(e) => setNewType(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 placeholder="ex: Carte de crédit"
               />
             </div>
@@ -180,6 +253,7 @@ export function Credits() {
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
                 value={newLimit}
                 onChange={(e) => setNewLimit(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 placeholder="0.00"
               />
             </div>
@@ -190,10 +264,22 @@ export function Credits() {
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
                 value={newRate}
                 onChange={(e) => setNewRate(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 placeholder="0.00"
               />
             </div>
-            <div className="md:col-span-2">
+            <div>
+              <label className="block text-sm font-semibold text-slate-600 mb-1">Montant initial ($)</label>
+              <input
+                type="number"
+                className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
+                value={newItemAmount}
+                onChange={(e) => setNewItemAmount(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-semibold text-slate-600 mb-1">Lien avec une Dette (Actifs/Passifs)</label>
               <select
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
@@ -218,9 +304,10 @@ export function Credits() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {credits.map((credit) => {
-          const currentLiabilityAmount = credit.liability?.snapshots?.[credit.liability.snapshots.length - 1]?.amount || 0;
+          const snapshots = credit.liability?.snapshots || [];
+          const sortedSnapshots = [...snapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+          const currentLiabilityAmount = sortedSnapshots[sortedSnapshots.length - 1]?.amount || 0;
           const utilization = credit.limit ? (currentLiabilityAmount / credit.limit) * 100 : 0;
-          
           const isEditing = editingId === credit.id;
 
           if (isEditing) {
@@ -228,51 +315,86 @@ export function Credits() {
               <div key={credit.id} className="bg-white p-6 rounded-2xl shadow-md border-2 border-rose-200 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-slate-700">Modifier le crédit</h3>
-                  <button onClick={() => setEditingId(null)} className="text-slate-400">
-                    <X size={18} />
-                  </button>
+                  <div className="flex gap-2">
+                    {credit.liability_id && (
+                      <button onClick={() => setShowHistoryFor(credit.liability_id!)} className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-[10px] font-bold">
+                        <HistoryIcon size={12} /> Historique
+                      </button>
+                    )}
+                    <button onClick={() => setEditingId(null)} className="text-slate-400">
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border-slate-200 text-sm"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nom"
-                  />
-                  <input
-                    type="text"
-                    className="w-full rounded-lg border-slate-200 text-sm"
-                    value={editType}
-                    onChange={(e) => setEditType(e.target.value)}
-                    placeholder="Type"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label>
                     <input
-                      type="number"
+                      type="text"
                       className="w-full rounded-lg border-slate-200 text-sm"
-                      value={editLimit}
-                      onChange={(e) => setEditLimit(e.target.value)}
-                      placeholder="Limite"
-                    />
-                    <input
-                      type="number"
-                      className="w-full rounded-lg border-slate-200 text-sm"
-                      value={editRate}
-                      onChange={(e) => setEditRate(e.target.value)}
-                      placeholder="Taux %"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                      autoFocus
                     />
                   </div>
-                  <select
-                    className="w-full rounded-lg border-slate-200 text-sm"
-                    value={editLiabilityId}
-                    onChange={(e) => setEditLiabilityId(e.target.value)}
-                  >
-                    <option value="">Aucun lien</option>
-                    {liabilities.map(l => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Type</label>
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border-slate-200 text-sm"
+                      value={editType}
+                      onChange={(e) => setEditType(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Limite ($)</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg border-slate-200 text-sm"
+                        value={editLimit}
+                        onChange={(e) => setEditLimit(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Taux %</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg border-slate-200 text-sm"
+                        value={editRate}
+                        onChange={(e) => setEditRate(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                      />
+                    </div>
+                  </div>
+                  {credit.liability_id && (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Solde actuel ($)</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg border-slate-200 text-sm font-bold"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Dette liée</label>
+                    <select
+                      className="w-full rounded-lg border-slate-200 text-sm"
+                      value={editLiabilityId}
+                      onChange={(e) => setEditLiabilityId(e.target.value)}
+                    >
+                      <option value="">Aucun lien</option>
+                      {liabilities.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <button
                     onClick={() => handleUpdate(credit.id)}
                     className="w-full bg-rose-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2"
@@ -300,10 +422,11 @@ export function Credits() {
                       setEditLimit(credit.limit?.toString() || "");
                       setEditRate(credit.interest_rate?.toString() || "");
                       setEditLiabilityId(credit.liability_id?.toString() || "");
+                      setEditAmount(currentLiabilityAmount.toString());
                     }}
                     className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                   >
-                    <Plus size={18} />
+                    <Edit2 size={18} />
                   </button>
                   <button
                     onClick={() => handleDelete(credit.id)}
@@ -352,7 +475,6 @@ export function Credits() {
                 <div className="pt-4 border-t border-slate-50 flex items-center gap-4">
                   {credit.interest_rate && (
                     <div className="flex items-center gap-1.5 text-slate-500">
-                      <Info size={14} />
                       <span className="text-xs font-bold">{credit.interest_rate}% Intérêt</span>
                     </div>
                   )}
@@ -379,6 +501,49 @@ export function Credits() {
           >
             Ajouter votre premier crédit
           </button>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryFor && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <HistoryIcon className="text-blue-600" size={24} />
+                <h3 className="font-bold text-xl">Historique du crédit</h3>
+              </div>
+              <button onClick={() => setShowHistoryFor(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-3">
+                {liabilities.find(l => l.id === showHistoryFor)?.snapshots?.slice().reverse().map(s => (
+                  <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-slate-500">{s.date}</span>
+                      <span className="font-bold text-slate-900">{s.amount.toLocaleString()} $</span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteSnapshot(s.id)}
+                      className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+              <button 
+                onClick={() => setShowHistoryFor(null)}
+                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

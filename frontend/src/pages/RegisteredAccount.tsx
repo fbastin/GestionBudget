@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { getContributions, createContribution, deleteContribution, updateContribution, getAssets } from "../api";
-import { Landmark, Plus, Trash2, Save, X, TrendingUp, History, PieChart } from "lucide-react";
+import { getContributions, createContribution, deleteContribution, updateContribution, getAssets, getBanks, addSnapshot, updateAsset, deleteSnapshot } from "../api";
+import { Landmark, Plus, Trash2, Save, X, TrendingUp, PieChart, Building2, Edit2, History as HistoryIcon } from "lucide-react";
 
 interface Snapshot {
+  id: number;
   date: string;
   amount: number;
 }
@@ -12,7 +13,14 @@ interface Asset {
   name: string;
   type: string;
   location?: string;
+  bank_id?: number;
+  details?: any;
   snapshots: Snapshot[];
+}
+
+interface Bank {
+  id: number;
+  name: string;
 }
 
 interface Contribution {
@@ -26,6 +34,7 @@ interface Contribution {
 export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   
   const [newYear, setNewYear] = useState(new Date().getFullYear().toString());
@@ -37,22 +46,88 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   const [editAmount, setEditAmount] = useState("");
   const [editInstitution, setEditInstitution] = useState("");
 
+  const [editingMetadataId, setEditingMetadataId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editBankId, setEditBankId] = useState("");
+  const [editFixedValue, setEditFixedValue] = useState("");
+  const [editAssetAmount, setEditAssetAmount] = useState("");
+
+  const [showHistoryFor, setShowHistoryFor] = useState<number | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const refreshData = async () => {
-    const [contRes, assetsRes] = await Promise.all([
-      getContributions(),
-      getAssets()
-    ]);
-    setContributions(contRes.data.filter((c: Contribution) => c.type === type));
-    // Filter assets that have "CELI" or "REER" in their location or name
-    setAssets(assetsRes.data.filter((a: Asset) => 
-      (a.location && a.location.toUpperCase().includes(type)) || 
-      a.name.toUpperCase().includes(type)
-    ));
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [contRes, assetsRes, banksRes] = await Promise.all([
+        getContributions(),
+        getAssets(),
+        getBanks()
+      ]);
+      setContributions(contRes.data.filter((c: Contribution) => c.type === type));
+      // Filter assets that have "CELI" or "REER" in their location or name
+      setAssets(assetsRes.data.filter((a: Asset) => 
+        (a.location && a.location.toUpperCase().includes(type)) || 
+        a.name.toUpperCase().includes(type)
+      ));
+      setBanks(banksRes.data);
+    } catch (err) {
+      console.error(`Failed to fetch ${type} data:`, err);
+      setError(`Erreur de chargement des données ${type}.`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     refreshData();
   }, [type]);
+
+  const handleUpdateAsset = async (id: number) => {
+    try {
+      await updateAsset(id, {
+        name: editName,
+        type: editType,
+        location: editLocation,
+        bank_id: editBankId === "" ? null : parseInt(editBankId),
+        details: { value: editFixedValue === "" ? null : parseFloat(editFixedValue) }
+      });
+      if (editAssetAmount !== "") {
+        await addSnapshot({
+          asset_id: id,
+          amount: parseFloat(editAssetAmount),
+          date: new Date().toISOString().split("T")[0],
+        });
+      }
+      setEditingMetadataId(null);
+      refreshData();
+    } catch (err) {
+      alert("Erreur lors de la modification");
+    }
+  };
+
+  const handleDeleteSnapshot = async (sid: number) => {
+    if (!window.confirm("Supprimer ce relevé historique ?")) return;
+    try {
+      await deleteSnapshot(sid);
+      refreshData();
+    } catch (err) {
+      alert("Erreur lors de la suppression du relevé");
+    }
+  };
+
+  const handleLinkBank = async (assetId: number, bankId: string) => {
+    try {
+      await updateAsset(assetId, { bank_id: bankId === "" ? null : parseInt(bankId) });
+      refreshData();
+    } catch (err) {
+      alert("Erreur lors de la liaison à la banque");
+    }
+  };
 
   const handleAdd = async () => {
     if (!newAmount) return;
@@ -97,13 +172,27 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   };
 
   const totalValue = assets.reduce((sum, a) => {
-    const lastSnapshot = a.snapshots?.[a.snapshots.length - 1]?.amount || 0;
+    const snapshots = [...a.snapshots].sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+    const lastSnapshot = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
     return sum + lastSnapshot;
   }, 0);
 
   const totalContributions = contributions.reduce((sum, c) => sum + c.amount, 0);
 
   const colorClass = type === "CELI" ? "emerald" : "indigo";
+
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement...</div>;
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="bg-rose-50 text-rose-600 p-4 rounded-xl border border-rose-200 inline-block">
+          <p className="font-bold mb-2">{error}</p>
+          <button onClick={refreshData} className="text-sm underline font-bold">Réessayer</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 font-sans text-slate-900">
@@ -155,17 +244,139 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
             Comptes et Placements {type}
           </h2>
           <div className="space-y-3">
-            {assets.length > 0 ? assets.map(a => (
-              <div key={a.id} className="p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-slate-800">{a.name}</div>
-                  <div className="text-xs text-slate-400 font-semibold">{a.location} • {a.type}</div>
+            {assets.length > 0 ? assets.map(a => {
+              const snapshots = [...a.snapshots].sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+              const currentAmount = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
+
+              if (editingMetadataId === a.id) {
+                return (
+                  <div key={a.id} className={`p-4 rounded-xl border-2 border-${colorClass}-200 bg-${colorClass}-50 space-y-3`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-bold text-${colorClass}-600 uppercase`}>Modifier l'actif</span>
+                      <div className="flex gap-2">
+                        <button onClick={() => setShowHistoryFor(a.id)} className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-[10px] font-bold">
+                          <HistoryIcon size={12} /> Historique
+                        </button>
+                        <button onClick={() => setEditingMetadataId(null)} className="text-slate-400">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      <input
+                        type="text"
+                        className="rounded-lg border-slate-200 text-sm"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
+                        autoFocus
+                        placeholder="Nom"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          className="rounded-lg border-slate-200 text-sm"
+                          value={editType}
+                          onChange={(e) => setEditType(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
+                          placeholder="Type"
+                        />
+                        <input
+                          type="text"
+                          className="rounded-lg border-slate-200 text-sm"
+                          value={editLocation}
+                          onChange={(e) => setEditLocation(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
+                          placeholder="Lieu"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          className="rounded-lg border-slate-200 text-sm"
+                          value={editBankId}
+                          onChange={(e) => setEditBankId(e.target.value)}
+                        >
+                          <option value="">Lier à une banque...</option>
+                          {banks.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          className="rounded-lg border-slate-200 text-sm"
+                          value={editFixedValue}
+                          onChange={(e) => setEditFixedValue(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
+                          placeholder="Valeur fixe"
+                        />
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          className="w-full rounded-lg border-slate-200 text-sm pr-8 font-bold"
+                          value={editAssetAmount}
+                          onChange={(e) => setEditAssetAmount(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
+                          placeholder="Solde actuel"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUpdateAsset(a.id)}
+                      className={`w-full bg-${colorClass}-600 text-white py-1.5 rounded-lg font-bold text-sm hover:bg-${colorClass}-700`}
+                    >
+                      Enregistrer
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={a.id} className="p-4 rounded-xl border border-slate-100 flex items-center justify-between group">
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => {
+                        setEditingMetadataId(a.id);
+                        setEditName(a.name);
+                        setEditType(a.type);
+                        setEditLocation(a.location || "");
+                        setEditBankId(a.bank_id?.toString() || "");
+                        setEditFixedValue(a.details?.value?.toString() || "");
+                        setEditAssetAmount(currentAmount.toString());
+                      }}
+                      className="p-1.5 text-slate-300 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-800">{a.name}</div>
+                      <div className="text-xs text-slate-400 font-semibold mb-2">{a.location} • {a.type}</div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Building2 size={14} className="text-slate-400" />
+                        <select 
+                          className="text-xs border-none bg-slate-50 rounded p-1 focus:ring-0 text-slate-500"
+                          value={a.bank_id || ""}
+                          onChange={(e) => handleLinkBank(a.id, e.target.value)}
+                        >
+                          <option value="">Lier à une banque...</option>
+                          {banks.map(b => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className={`font-bold text-${colorClass}-600 text-lg`}>
+                      {currentAmount.toLocaleString()} $
+                    </div>
+                  </div>
                 </div>
-                <div className={`font-bold text-${colorClass}-600 text-lg`}>
-                  {(a.snapshots?.[a.snapshots.length - 1]?.amount || 0).toLocaleString()} $
-                </div>
-              </div>
-            )) : (
+              );
+            }) : (
               <p className="text-slate-400 text-sm italic">Aucun actif tagué "{type}" trouvé dans Actifs/Passifs.</p>
             )}
           </div>
@@ -174,7 +385,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         {/* Contributions List */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <History className="text-slate-500" size={24} />
+            <HistoryIcon className="text-slate-500" size={24} />
             Historique des Contributions
           </h2>
 
@@ -192,6 +403,8 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                   className="rounded-lg border-slate-200 text-sm"
                   value={newYear}
                   onChange={(e) => setNewYear(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                  autoFocus
                   placeholder="Année"
                 />
                 <input
@@ -199,6 +412,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                   className="rounded-lg border-slate-200 text-sm col-span-2"
                   value={newInstitution}
                   onChange={(e) => setNewInstitution(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                   placeholder="Institution"
                 />
               </div>
@@ -207,6 +421,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                 className="w-full rounded-lg border-slate-200 text-sm"
                 value={newAmount}
                 onChange={(e) => setNewAmount(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 placeholder="Montant ($)"
               />
               <button
@@ -228,12 +443,15 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                       className="rounded-lg border-slate-200 text-sm"
                       value={editYear}
                       onChange={(e) => setEditYear(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdate(c.id)}
+                      autoFocus
                     />
                     <input
                       type="text"
                       className="rounded-lg border-slate-200 text-sm"
                       value={editInstitution}
                       onChange={(e) => setEditInstitution(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdate(c.id)}
                     />
                     <div className="flex gap-1">
                       <input
@@ -241,6 +459,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                         className="rounded-lg border-slate-200 text-sm w-full"
                         value={editAmount}
                         onChange={(e) => setEditAmount(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(c.id)}
                       />
                       <button onClick={() => handleUpdate(c.id)} className={`p-2 bg-${colorClass}-600 text-white rounded-lg`}><Save size={16} /></button>
                     </div>
@@ -266,7 +485,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                           }}
                           className="p-1.5 text-slate-300 hover:text-blue-600"
                         >
-                          <Plus size={16} />
+                          <Edit2 size={16} />
                         </button>
                         <button onClick={() => handleDelete(c.id)} className="p-1.5 text-slate-300 hover:text-rose-600">
                           <Trash2 size={16} />
@@ -280,6 +499,49 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
           </div>
         </div>
       </div>
+
+      {/* History Modal */}
+      {showHistoryFor && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <HistoryIcon className="text-blue-600" size={24} />
+                <h3 className="font-bold text-xl">Historique des relevés</h3>
+              </div>
+              <button onClick={() => setShowHistoryFor(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-3">
+                {assets.find(a => a.id === showHistoryFor)?.snapshots?.slice().reverse().map(s => (
+                  <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-slate-500">{s.date}</span>
+                      <span className="font-bold text-slate-900">{s.amount.toLocaleString()} $</span>
+                    </div>
+                    <button 
+                      onClick={() => handleDeleteSnapshot(s.id)}
+                      className="p-1.5 text-slate-300 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100">
+              <button 
+                onClick={() => setShowHistoryFor(null)}
+                className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

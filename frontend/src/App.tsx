@@ -4,6 +4,7 @@ import { ActifsPassifs } from "./pages/ActifsPassifs";
 import { Banques } from "./pages/Banques";
 import { Credits } from "./pages/Credits";
 import { RegisteredAccount } from "./pages/RegisteredAccount";
+import { Investissements } from "./pages/Investissements";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<ActifsPassifs />} />
+          <Route path="/investissements" element={<Investissements />} />
           <Route path="/banques" element={<Banques />} />
           <Route path="/credits" element={<Credits />} />
           <Route path="/celi" element={<RegisteredAccount type="CELI" />} />

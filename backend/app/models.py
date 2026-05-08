@@ -11,7 +11,20 @@ class Asset(Base):
     type = Column(String)
     location = Column(String, nullable=True)
     details = Column(JSON, nullable=True)
+    bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
     snapshots = relationship('Snapshot', back_populates='asset', cascade='all, delete-orphan')
+    bank = relationship('Bank', back_populates='assets')
+    investments = relationship('Investment', back_populates='asset', cascade='all, delete-orphan')
+
+class Investment(Base):
+    __tablename__ = 'investments'
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, index=True)
+    quantity = Column(Float)
+    average_cost = Column(Float)
+    current_price = Column(Float, nullable=True)
+    asset_id = Column(Integer, ForeignKey('assets.id'))
+    asset = relationship('Asset', back_populates='investments')
 
 class Liability(Base):
     __tablename__ = 'liabilities'
@@ -68,3 +81,4 @@ class Bank(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     balance = Column(Float, default=0.0)
+    assets = relationship('Asset', back_populates='bank')

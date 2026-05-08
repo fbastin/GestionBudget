@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
-import { getBanks, createBank, deleteBank, updateBank } from "../api";
-import { Building2, Plus, Trash2, Save, X, Landmark } from "lucide-react";
+import { getBanks, createBank, deleteBank, updateBank, getAssets } from "../api";
+import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2 } from "lucide-react";
+
+interface Snapshot {
+  date: string;
+  amount: number;
+}
+
+interface Asset {
+  id: number;
+  name: string;
+  type: string;
+  location?: string;
+  bank_id?: number;
+  snapshots: Snapshot[];
+}
 
 interface Bank {
   id: number;
@@ -10,18 +24,38 @@ interface Bank {
 
 export function Banques() {
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newBalance, setNewBalance] = useState("");
+  
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
   const [editBalance, setEditBalance] = useState("");
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const refreshBanks = () => {
-    getBanks().then((res) => setBanks(res.data));
+  const refreshData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [banksRes, assetsRes] = await Promise.all([
+        getBanks(),
+        getAssets()
+      ]);
+      setBanks(banksRes.data);
+      setAssets(assetsRes.data);
+    } catch (err) {
+      console.error("Failed to fetch banks:", err);
+      setError("Erreur de chargement des données bancaires.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    refreshBanks();
+    refreshData();
   }, []);
 
   const handleAdd = async () => {
@@ -31,7 +65,7 @@ export function Banques() {
       setIsAdding(false);
       setNewName("");
       setNewBalance("");
-      refreshBanks();
+      refreshData();
     } catch (err) {
       alert("Erreur lors de l'ajout de la banque");
     }
@@ -41,23 +75,45 @@ export function Banques() {
     if (!window.confirm("Supprimer cette banque ?")) return;
     try {
       await deleteBank(id);
-      refreshBanks();
+      refreshData();
     } catch (err) {
       alert("Erreur lors de la suppression");
     }
   };
 
-  const handleUpdateBalance = async (id: number) => {
+  const handleUpdateBank = async (id: number) => {
     try {
-      await updateBank(id, { balance: parseFloat(editBalance) });
+      await updateBank(id, { 
+        name: editName,
+        balance: parseFloat(editBalance) 
+      });
       setEditingId(null);
-      refreshBanks();
+      refreshData();
     } catch (err) {
       alert("Erreur lors de la mise à jour");
     }
   };
 
-  const totalBalance = banks.reduce((sum, bank) => sum + bank.balance, 0);
+  const getBankAssetsTotal = (bankId: number) => {
+    return assets
+      .filter(a => a.bank_id === bankId)
+      .reduce((sum, a) => sum + (a.snapshots?.[a.snapshots.length - 1]?.amount || 0), 0);
+  };
+
+  const totalBalance = banks.reduce((sum, bank) => sum + bank.balance + getBankAssetsTotal(bank.id), 0);
+
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement...</div>;
+
+  if (error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="bg-rose-50 text-rose-600 p-4 rounded-xl border border-rose-200 inline-block">
+          <p className="font-bold mb-2">{error}</p>
+          <button onClick={refreshData} className="text-sm underline font-bold">Réessayer</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 font-sans text-slate-900">
@@ -69,7 +125,11 @@ export function Banques() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestion des Banques</h1>
         </div>
         <button
-          onClick={() => setIsAdding(true)}
+          onClick={() => {
+            setIsAdding(true);
+            setNewName("");
+            setNewBalance("");
+          }}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all shadow-sm active:scale-95"
         >
           <Plus size={18} />
@@ -103,6 +163,8 @@ export function Banques() {
                 className="w-full rounded-lg border-slate-200 focus:ring-indigo-500 focus:border-indigo-500"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                autoFocus
                 placeholder="ex: Ma banque"
               />
             </div>
@@ -113,6 +175,7 @@ export function Banques() {
                 className="w-full rounded-lg border-slate-200 focus:ring-indigo-500 focus:border-indigo-500"
                 value={newBalance}
                 onChange={(e) => setNewBalance(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
                 placeholder="0.00"
               />
             </div>
@@ -127,54 +190,112 @@ export function Banques() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {banks.map((bank) => (
-          <div key={bank.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
-            <div className="flex items-center justify-between mb-4">
-              <div className="font-bold text-lg text-slate-800">{bank.name}</div>
-              <button
-                onClick={() => handleDelete(bank.id)}
-                className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={18} />
-              </button>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              {editingId === bank.id ? (
-                <div className="flex items-center gap-2 w-full">
-                  <input
-                    type="number"
-                    className="flex-1 rounded-lg border-indigo-200 focus:ring-indigo-500 font-bold text-right"
-                    value={editBalance}
-                    onChange={(e) => setEditBalance(e.target.value)}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleUpdateBalance(bank.id)}
-                    className="bg-indigo-600 text-white p-2 rounded-lg"
-                  >
-                    <Save size={18} />
+        {banks.map((bank) => {
+          const bankAssets = assets.filter(a => a.bank_id === bank.id);
+          const assetsTotal = getBankAssetsTotal(bank.id);
+          const institutionTotal = bank.balance + assetsTotal;
+          const isEditing = editingId === bank.id;
+
+          if (isEditing) {
+            return (
+              <div key={bank.id} className="bg-white p-6 rounded-2xl shadow-md border-2 border-indigo-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-slate-700">Modifier l'institution</h3>
+                  <button onClick={() => setEditingId(null)} className="text-slate-400">
+                    <X size={18} />
                   </button>
                 </div>
-              ) : (
-                <>
-                  <div className="text-2xl font-bold text-slate-900">
-                    {bank.balance.toLocaleString()} $
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nom</label>
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border-slate-200 text-sm"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdateBank(bank.id)}
+                      autoFocus
+                    />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase">Solde Bancaire ($)</label>
+                    <input
+                      type="number"
+                      className="w-full rounded-lg border-slate-200 text-sm font-bold"
+                      value={editBalance}
+                      onChange={(e) => setEditBalance(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleUpdateBank(bank.id)}
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleUpdateBank(bank.id)}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2"
+                  >
+                    <Save size={18} /> Enregistrer
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={bank.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-bold text-lg text-slate-800">{bank.name}</div>
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => {
                       setEditingId(bank.id);
+                      setEditName(bank.name);
                       setEditBalance(bank.balance.toString());
                     }}
-                    className="text-xs font-bold text-indigo-600 hover:underline"
+                    className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                   >
-                    Modifier
+                    <Edit2 size={18} />
                   </button>
-                </>
-              )}
+                  <button
+                    onClick={() => handleDelete(bank.id)}
+                    className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-50">
+                  <div className="text-sm font-medium text-slate-500 flex items-center gap-1">
+                    <Wallet size={14} /> Solde Bancaire
+                  </div>
+                  <span className="font-bold text-slate-700">{bank.balance.toLocaleString()} $</span>
+                </div>
+
+                {bankAssets.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Comptes liés (CELI/REER/Actifs)</div>
+                    {bankAssets.map(a => (
+                      <div key={a.id} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-600">{a.name}</span>
+                        <span className="font-semibold text-slate-800">{(a.snapshots?.[a.snapshots.length - 1]?.amount || 0).toLocaleString()} $</span>
+                      </div>
+                    ))}
+                    <div className="pt-1 flex items-center justify-between text-xs border-t border-slate-50">
+                      <span className="text-slate-400 italic">Sous-total actifs</span>
+                      <span className="font-bold text-emerald-600">{assetsTotal.toLocaleString()} $</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-900">Total Institution</span>
+                    <span className="text-xl font-black text-indigo-600">{institutionTotal.toLocaleString()} $</span>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {banks.length === 0 && !isAdding && (
