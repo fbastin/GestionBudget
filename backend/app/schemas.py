@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
-from datetime import date
+from typing import List, Optional, Union
+from datetime import date as dt_date
 
 class SnapshotBase(BaseModel):
-    date: date
+    date: dt_date
     amount: float
     model_config = ConfigDict(from_attributes=True)
 
@@ -105,7 +105,7 @@ class DashboardData(BaseModel):
     net_worth: float
 
 class HistoryItem(BaseModel):
-    date: date
+    date: dt_date
     assets: float
     liabilities: float
     net_worth: float
@@ -122,6 +122,27 @@ class BankUpdate(BaseModel):
     balance: Optional[float] = None
 
 class Bank(BankBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class ExpenseBase(BaseModel):
+    date: dt_date
+    description: str
+    amount: float
+    bank_id: Optional[int] = None
+    credit_id: Optional[int] = None
+
+class ExpenseCreate(ExpenseBase):
+    pass
+
+class ExpenseUpdate(BaseModel):
+    date: Optional[dt_date] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    bank_id: Optional[int] = None
+    credit_id: Optional[int] = None
+
+class Expense(ExpenseBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 

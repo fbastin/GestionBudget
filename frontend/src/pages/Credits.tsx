@@ -105,20 +105,21 @@ export function Credits() {
 
   const handleUpdate = async (id: number) => {
     try {
-      const credit = credits.find(c => c.id === id);
+      const targetLiabilityId = editLiabilityId ? parseInt(editLiabilityId) : null;
+      
       await updateCredit(id, {
         name: editName,
         type: editType,
         limit: parseFloat(editLimit) || null,
         interest_rate: parseFloat(editRate) || null,
-        liability_id: editLiabilityId ? parseInt(editLiabilityId) : null,
+        liability_id: targetLiabilityId,
       });
 
-      if (editAmount !== "" && credit?.liability_id) {
+      if (editAmount !== "" && targetLiabilityId) {
         await addSnapshot({
-          liability_id: credit.liability_id,
+          liability_id: targetLiabilityId,
           amount: parseFloat(editAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
 
@@ -149,9 +150,12 @@ export function Credits() {
     }
   };
 
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const totalBalance = credits.reduce((sum, c) => {
     const snapshots = c.liability?.snapshots || [];
-    const sorted = [...snapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+    const filtered = snapshots.filter(s => s.date <= todayStr);
+    const sorted = [...filtered].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
     const amount = sorted[sorted.length - 1]?.amount || 0;
     return sum + amount;
   }, 0);
@@ -269,17 +273,6 @@ export function Credits() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-600 mb-1">Montant initial ($)</label>
-              <input
-                type="number"
-                className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
-                value={newItemAmount}
-                onChange={(e) => setNewItemAmount(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="0.00"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-semibold text-slate-600 mb-1">Lien avec une Dette (Actifs/Passifs)</label>
               <select
                 className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
@@ -292,6 +285,19 @@ export function Credits() {
                 ))}
               </select>
             </div>
+            {newLiabilityId && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">Montant initial ($)</label>
+                <input
+                  type="number"
+                  className="w-full rounded-lg border-slate-200 focus:ring-rose-500"
+                  value={newItemAmount}
+                  onChange={(e) => setNewItemAmount(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                  placeholder="0.00"
+                />
+              </div>
+            )}
           </div>
           <button
             onClick={handleAdd}
@@ -305,7 +311,8 @@ export function Credits() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {credits.map((credit) => {
           const snapshots = credit.liability?.snapshots || [];
-          const sortedSnapshots = [...snapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+          const filteredSnapshots = snapshots.filter(s => s.date <= todayStr);
+          const sortedSnapshots = [...filteredSnapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
           const currentLiabilityAmount = sortedSnapshots[sortedSnapshots.length - 1]?.amount || 0;
           const utilization = credit.limit ? (currentLiabilityAmount / credit.limit) * 100 : 0;
           const isEditing = editingId === credit.id;
@@ -370,18 +377,6 @@ export function Credits() {
                       />
                     </div>
                   </div>
-                  {credit.liability_id && (
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Solde actuel ($)</label>
-                      <input
-                        type="number"
-                        className="w-full rounded-lg border-slate-200 text-sm font-bold"
-                        value={editAmount}
-                        onChange={(e) => setEditAmount(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
-                      />
-                    </div>
-                  )}
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase">Dette liée</label>
                     <select
@@ -395,6 +390,18 @@ export function Credits() {
                       ))}
                     </select>
                   </div>
+                  {editLiabilityId && (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Solde actuel ($)</label>
+                      <input
+                        type="number"
+                        className="w-full rounded-lg border-slate-200 text-sm font-bold"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleUpdate(credit.id)}
+                      />
+                    </div>
+                  )}
                   <button
                     onClick={() => handleUpdate(credit.id)}
                     className="w-full bg-rose-600 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2"

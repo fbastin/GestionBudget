@@ -1,6 +1,27 @@
 import { useEffect, useState } from "react";
-import { getContributions, createContribution, deleteContribution, updateContribution, getAssets, getBanks, addSnapshot, updateAsset, deleteSnapshot } from "../api";
-import { Landmark, Plus, Trash2, Save, X, TrendingUp, PieChart, Building2, Edit2, History as HistoryIcon } from "lucide-react";
+import { 
+  getContributions, 
+  createContribution, 
+  deleteContribution, 
+  updateContribution, 
+  getAssets, 
+  getBanks, 
+  addSnapshot, 
+  updateAsset, 
+  deleteSnapshot 
+} from "../api";
+import { 
+  Landmark, 
+  Plus, 
+  Trash2, 
+  Save, 
+  X, 
+  TrendingUp, 
+  PieChart, 
+  Building2, 
+  Edit2, 
+  History as HistoryIcon 
+} from "lucide-react";
 
 interface Snapshot {
   id: number;
@@ -59,6 +80,8 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
@@ -69,7 +92,6 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         getBanks()
       ]);
       setContributions(contRes.data.filter((c: Contribution) => c.type === type));
-      // Filter assets that have "CELI" or "REER" in their location or name
       setAssets(assetsRes.data.filter((a: Asset) => 
         (a.location && a.location.toUpperCase().includes(type)) || 
         a.name.toUpperCase().includes(type)
@@ -100,7 +122,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         await addSnapshot({
           asset_id: id,
           amount: parseFloat(editAssetAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
       setEditingMetadataId(null);
@@ -172,14 +194,34 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   };
 
   const totalValue = assets.reduce((sum, a) => {
-    const snapshots = [...a.snapshots].sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+    const snapshots = [...a.snapshots].filter(s => s.date <= todayStr).sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
     const lastSnapshot = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
     return sum + lastSnapshot;
   }, 0);
 
   const totalContributions = contributions.reduce((sum, c) => sum + c.amount, 0);
 
-  const colorClass = type === "CELI" ? "emerald" : "indigo";
+  const colorConfig = {
+    CELI: { 
+      bg: 'bg-emerald-600', 
+      hover: 'hover:bg-emerald-700', 
+      text: 'text-emerald-600', 
+      border: 'border-emerald-200', 
+      bgLight: 'bg-emerald-50', 
+      border500: 'border-emerald-500', 
+      text500: 'text-emerald-500' 
+    },
+    REER: { 
+      bg: 'bg-indigo-600', 
+      hover: 'hover:bg-indigo-700', 
+      text: 'text-indigo-600', 
+      border: 'border-indigo-200', 
+      bgLight: 'bg-indigo-50', 
+      border500: 'border-indigo-500', 
+      text500: 'text-indigo-500' 
+    }
+  };
+  const theme = colorConfig[type];
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Chargement...</div>;
 
@@ -198,14 +240,14 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
     <div className="p-4 md:p-8 font-sans text-slate-900">
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className={`bg-${colorClass}-600 p-2 rounded-lg text-white shadow-lg`}>
+          <div className={`${theme.bg} p-2 rounded-lg text-white shadow-lg`}>
             <Landmark size={24} />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestion du {type}</h1>
         </div>
         <button
           onClick={() => setIsAdding(true)}
-          className={`flex items-center gap-2 bg-${colorClass}-600 text-white px-4 py-2 rounded-lg hover:bg-${colorClass}-700 transition-all shadow-sm active:scale-95`}
+          className={`flex items-center gap-2 ${theme.bg} text-white px-4 py-2 rounded-lg ${theme.hover} transition-all shadow-sm active:scale-95`}
         >
           <Plus size={18} />
           <span className="font-semibold">Nouvelle Contribution</span>
@@ -214,7 +256,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className={`flex items-center gap-2 text-${colorClass}-600 mb-2`}>
+          <div className={`flex items-center gap-2 ${theme.text} mb-2`}>
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Actuelle</span>
           </div>
@@ -227,7 +269,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
           </div>
           <div className="text-3xl font-extrabold">{totalContributions.toLocaleString()} $</div>
         </div>
-        <div className={`bg-${colorClass}-600 p-6 rounded-2xl shadow-lg border border-${colorClass}-500 text-white`}>
+        <div className={`${theme.bg} p-6 rounded-2xl shadow-lg border ${theme.border500} text-white`}>
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Gain/Perte Latent</span>
@@ -240,19 +282,19 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         {/* Assets List */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Landmark className={`text-${colorClass}-500`} size={24} />
+            <Landmark className={`${theme.text500}`} size={24} />
             Comptes et Placements {type}
           </h2>
           <div className="space-y-3">
             {assets.length > 0 ? assets.map(a => {
-              const snapshots = [...a.snapshots].sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+              const snapshots = [...a.snapshots].filter(s => s.date <= todayStr).sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
               const currentAmount = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
 
               if (editingMetadataId === a.id) {
                 return (
-                  <div key={a.id} className={`p-4 rounded-xl border-2 border-${colorClass}-200 bg-${colorClass}-50 space-y-3`}>
+                  <div key={a.id} className={`p-4 rounded-xl border-2 ${theme.border} ${theme.bgLight} space-y-3`}>
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold text-${colorClass}-600 uppercase`}>Modifier l'actif</span>
+                      <span className={`text-xs font-bold ${theme.text} uppercase`}>Modifier l'actif</span>
                       <div className="flex gap-2">
                         <button onClick={() => setShowHistoryFor(a.id)} className="text-slate-500 hover:text-slate-700 flex items-center gap-1 text-[10px] font-bold">
                           <HistoryIcon size={12} /> Historique
@@ -324,7 +366,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                     </div>
                     <button
                       onClick={() => handleUpdateAsset(a.id)}
-                      className={`w-full bg-${colorClass}-600 text-white py-1.5 rounded-lg font-bold text-sm hover:bg-${colorClass}-700`}
+                      className={`w-full ${theme.bg} text-white py-1.5 rounded-lg font-bold text-sm ${theme.hover}`}
                     >
                       Enregistrer
                     </button>
@@ -370,7 +412,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className={`font-bold text-${colorClass}-600 text-lg`}>
+                    <div className={`font-bold ${theme.text} text-lg`}>
                       {currentAmount.toLocaleString()} $
                     </div>
                   </div>
@@ -426,7 +468,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
               />
               <button
                 onClick={handleAdd}
-                className={`w-full bg-${colorClass}-600 text-white py-2 rounded-lg font-bold`}
+                className={`w-full ${theme.bg} text-white py-2 rounded-lg font-bold`}
               >
                 Ajouter
               </button>
@@ -461,7 +503,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                         onChange={(e) => setEditAmount(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleUpdate(c.id)}
                       />
-                      <button onClick={() => handleUpdate(c.id)} className={`p-2 bg-${colorClass}-600 text-white rounded-lg`}><Save size={16} /></button>
+                      <button onClick={() => handleUpdate(c.id)} className={`p-2 ${theme.bg} text-white rounded-lg`}><Save size={16} /></button>
                     </div>
                   </div>
                 ) : (

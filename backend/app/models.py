@@ -75,6 +75,7 @@ class Credit(Base):
     interest_rate = Column(Float, nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     liability = relationship('Liability', back_populates='credits')
+    expenses = relationship('Expense', back_populates='credit')
 
 class Bank(Base):
     __tablename__ = 'banks'
@@ -82,3 +83,16 @@ class Bank(Base):
     name = Column(String, index=True)
     balance = Column(Float, default=0.0)
     assets = relationship('Asset', back_populates='bank')
+    expenses = relationship('Expense', back_populates='bank')
+
+class Expense(Base):
+    __tablename__ = 'expenses'
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date)
+    description = Column(String)
+    amount = Column(Float)
+    bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
+    
+    bank = relationship('Bank', back_populates='expenses')
+    credit = relationship('Credit', back_populates='expenses')

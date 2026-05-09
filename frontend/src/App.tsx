@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ActifsPassifs } from "./pages/ActifsPassifs";
+import { Depenses } from "./pages/Depenses";
 import { Banques } from "./pages/Banques";
 import { Credits } from "./pages/Credits";
 import { RegisteredAccount } from "./pages/RegisteredAccount";
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<ActifsPassifs />} />
+          <Route path="/depenses" element={<Depenses />} />
           <Route path="/investissements" element={<Investissements />} />
           <Route path="/banques" element={<Banques />} />
           <Route path="/credits" element={<Credits />} />

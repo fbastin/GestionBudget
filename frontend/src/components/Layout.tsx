@@ -1,11 +1,12 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Building2, ChevronRight, CreditCard, TrendingUp, Landmark } from "lucide-react";
+import { LayoutDashboard, Building2, ChevronRight, CreditCard, TrendingUp, Landmark, Receipt } from "lucide-react";
 
 export function Layout() {
   const location = useLocation();
 
   const menuItems = [
     { path: "/", label: "Actifs/Passifs", icon: <LayoutDashboard size={20} /> },
+    { path: "/depenses", label: "Dépenses", icon: <Receipt size={20} /> },
     { path: "/investissements", label: "Investissements", icon: <TrendingUp size={20} /> },
     { path: "/banques", label: "Banques", icon: <Building2 size={20} /> },
     { path: "/credits", label: "Crédits", icon: <CreditCard size={20} /> },

@@ -1,8 +1,46 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDashboard, getLiabilities, addSnapshot, exportCSV, getAssets, getHistory, createAsset, deleteAsset, createLiability, deleteLiability, getBanks, updateAsset, updateLiability, importCSV, deleteSnapshot } from "../api";
-import { LayoutDashboard, Wallet, TrendingDown, Landmark, Download, Plus, Trash2, X, Building2, Upload, Edit2, ChevronRight, History as HistoryIcon } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { 
+  getDashboard, 
+  getLiabilities, 
+  addSnapshot, 
+  exportCSV, 
+  getAssets, 
+  getHistory, 
+  createAsset, 
+  deleteAsset, 
+  createLiability, 
+  deleteLiability, 
+  getBanks, 
+  updateAsset, 
+  updateLiability, 
+  importCSV, 
+  deleteSnapshot 
+} from "../api";
+import { 
+  LayoutDashboard, 
+  Wallet, 
+  TrendingDown, 
+  Landmark, 
+  Download, 
+  Plus, 
+  Trash2, 
+  X, 
+  Building2, 
+  Upload, 
+  Edit2, 
+  ChevronRight, 
+  History as HistoryIcon 
+} from "lucide-react";
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from "recharts";
 
 interface DashboardData {
   total_assets: number;
@@ -77,6 +115,8 @@ export function ActifsPassifs() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
@@ -95,7 +135,7 @@ export function ActifsPassifs() {
       setBanks(bankRes.data);
     } catch (err: any) {
       console.error("Failed to fetch data:", err);
-      setError(`Impossible de charger les données (${err.message || 'Erreur inconnue'}). Veuillez vérifier que le serveur est lancé sur le port 8000.`);
+      setError(`Impossible de charger les données (${err.message || 'Erreur inconnue'}).`);
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +152,7 @@ export function ActifsPassifs() {
         await addSnapshot({
           liability_id: id,
           amount: parseFloat(editAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
       setEditingMetadataId(null);
@@ -135,7 +175,7 @@ export function ActifsPassifs() {
         await addSnapshot({
           asset_id: id,
           amount: parseFloat(editAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
       setEditingAssetMetadataId(null);
@@ -163,7 +203,7 @@ export function ActifsPassifs() {
         await addSnapshot({
           liability_id: res.data.id,
           amount: parseFloat(newItemAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
       setIsAddingLiability(false);
@@ -199,7 +239,7 @@ export function ActifsPassifs() {
         await addSnapshot({
           asset_id: res.data.id,
           amount: parseFloat(newItemAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayStr,
         });
       }
       setIsAddingAsset(false);
@@ -461,7 +501,7 @@ export function ActifsPassifs() {
 
           <div className="space-y-3">
             {liabilities.map((l) => {
-              const snapshots = [...l.snapshots].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
+              const snapshots = [...l.snapshots].filter(s => s.date <= todayStr).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
               const currentAmount = snapshots[snapshots.length - 1]?.amount || 0;
               
               if (editingMetadataId === l.id) {
@@ -658,7 +698,7 @@ export function ActifsPassifs() {
 
           <div className="space-y-3">
             {assets.map((a) => {
-              const snapshots = [...a.snapshots].sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+              const snapshots = [...a.snapshots].filter(s => s.date <= todayStr).sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
               const currentAmount = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
               
               if (editingAssetMetadataId === a.id) {

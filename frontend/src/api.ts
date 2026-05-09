@@ -40,6 +40,21 @@ export const createInvestment = (data: any) => api.post("/investments", data);
 export const updateInvestment = (id: number, data: any) => api.patch("/investments/" + id, data);
 export const deleteInvestment = (id: number) => api.delete("/investments/" + id);
 
+export const getExpenses = () => api.get("/expenses");
+export const createExpense = (data: any) => api.post("/expenses", data);
+export const updateExpense = (id: number, data: any) => api.patch("/expenses/" + id, data);
+export const deleteExpense = (id: number) => api.delete("/expenses/" + id);
+export const exportExpensesCSV = () => window.open(`http://${window.location.hostname}:8000/export/expenses/csv`, "_blank");
+export const importExpensesCSV = (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post("/import/expenses/csv", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};
+
 export const exportCSV = () => window.open(`http://${window.location.hostname}:8000/export/csv`, "_blank");
 
 export const importCSV = (file: File) => {
