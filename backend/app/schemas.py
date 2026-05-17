@@ -131,6 +131,7 @@ class ExpenseBase(BaseModel):
     amount: float
     bank_id: Optional[int] = None
     credit_id: Optional[int] = None
+    liability_id: Optional[int] = None
 
 class ExpenseCreate(ExpenseBase):
     pass
@@ -141,12 +142,39 @@ class ExpenseUpdate(BaseModel):
     amount: Optional[float] = None
     bank_id: Optional[int] = None
     credit_id: Optional[int] = None
+    liability_id: Optional[int] = None
 
 class Expense(ExpenseBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+class PaymentBase(BaseModel):
+    date: dt_date
+    description: str
+    amount: float
+    interest: float = 0.0
+    bank_id: Optional[int] = None
+    credit_id: Optional[int] = None
+    liability_id: Optional[int] = None
+
+class PaymentCreate(PaymentBase):
+    pass
+
+class PaymentUpdate(BaseModel):
+    date: Optional[dt_date] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    interest: Optional[float] = None
+    bank_id: Optional[int] = None
+    credit_id: Optional[int] = None
+    liability_id: Optional[int] = None
+
+class Payment(PaymentBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class ContributionBase(BaseModel):
+
     year: int
     type: str
     amount: float

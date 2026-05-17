@@ -44,6 +44,10 @@ export const getExpenses = () => api.get("/expenses");
 export const createExpense = (data: any) => api.post("/expenses", data);
 export const updateExpense = (id: number, data: any) => api.patch("/expenses/" + id, data);
 export const deleteExpense = (id: number) => api.delete("/expenses/" + id);
+export const getPayments = () => api.get("/payments");
+export const createPayment = (data: any) => api.post("/payments", data);
+export const updatePayment = (id: number, data: any) => api.patch("/payments/" + id, data);
+export const deletePayment = (id: number) => api.delete("/payments/" + id);
 export const exportExpensesCSV = () => window.open(`http://${window.location.hostname}:8000/export/expenses/csv`, "_blank");
 export const importExpensesCSV = (file: File) => {
   const formData = new FormData();

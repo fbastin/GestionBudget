@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ActifsPassifs } from "./pages/ActifsPassifs";
 import { Depenses } from "./pages/Depenses";
+import { Paiements } from "./pages/Paiements";
 import { Banques } from "./pages/Banques";
 import { Credits } from "./pages/Credits";
 import { RegisteredAccount } from "./pages/RegisteredAccount";
@@ -14,6 +15,7 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<ActifsPassifs />} />
           <Route path="/depenses" element={<Depenses />} />
+          <Route path="/paiements" element={<Paiements />} />
           <Route path="/investissements" element={<Investissements />} />
           <Route path="/banques" element={<Banques />} />
           <Route path="/credits" element={<Credits />} />

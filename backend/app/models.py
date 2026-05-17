@@ -93,6 +93,23 @@ class Expense(Base):
     amount = Column(Float)
     bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
     credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
+    liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     
     bank = relationship('Bank', back_populates='expenses')
     credit = relationship('Credit', back_populates='expenses')
+    liability = relationship('Liability')
+
+class Payment(Base):
+    __tablename__ = 'payments'
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date)
+    description = Column(String)
+    amount = Column(Float)
+    interest = Column(Float, default=0.0)
+    bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
+    liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
+    
+    bank = relationship('Bank')
+    credit = relationship('Credit')
+    liability = relationship('Liability')
