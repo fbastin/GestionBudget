@@ -26,6 +26,7 @@ import {
 export function Paiements() {
   const [payments, setPayments] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
   const [credits, setCredits] = useState<any[]>([]);
   const [liabilities, setLiabilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,20 +39,23 @@ export function Paiements() {
     amount: "",
     interest: "",
     bankId: "",
+    assetId: "",
     creditId: ""
   });
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [paymentsRes, banksRes, creditsRes, liabilitiesRes] = await Promise.all([
+      const [paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes] = await Promise.all([
         getPayments(),
         getBanks(),
+        getAssets(),
         getCredits(),
         getLiabilities()
       ]);
       setPayments(paymentsRes.data);
       setBanks(banksRes.data);
+      setAssets(assetsRes.data);
       setCredits(creditsRes.data);
       setLiabilities(liabilitiesRes.data);
       setError(null);
@@ -74,6 +78,8 @@ export function Paiements() {
     try {
       let credit_id = null;
       let liability_id = null;
+      let bank_id = null;
+      let asset_id = null;
 
       if (newPayment.creditId.startsWith("credit:")) {
         credit_id = parseInt(newPayment.creditId.split(":")[1]);
@@ -81,12 +87,24 @@ export function Paiements() {
         liability_id = parseInt(newPayment.creditId.split(":")[1]);
       }
 
+      if (newPayment.bankId.startsWith("bank:")) {
+        bank_id = parseInt(newPayment.bankId.split(":")[1]);
+      } else if (newPayment.bankId.startsWith("asset:")) {
+        asset_id = parseInt(newPayment.bankId.split(":")[1]);
+        // Also find the bank associated with this asset for model consistency
+        const assetObj = assets.find(a => a.id === asset_id);
+        if (assetObj && assetObj.bank_id) {
+            bank_id = assetObj.bank_id;
+        }
+      }
+
       const payload = {
         date: newPayment.date,
         description: newPayment.description,
         amount: parseFloat(newPayment.amount),
         interest: parseFloat(newPayment.interest) || 0,
-        bank_id: newPayment.bankId ? parseInt(newPayment.bankId) : null,
+        bank_id,
+        asset_id,
         credit_id,
         liability_id
       };
@@ -102,6 +120,7 @@ export function Paiements() {
         amount: "",
         interest: "",
         bankId: "",
+        assetId: "",
         creditId: ""
       });
       setEditingId(null);
@@ -117,12 +136,17 @@ export function Paiements() {
     if (payment.credit_id) creditId = `credit:${payment.credit_id}`;
     else if (payment.liability_id) creditId = `liability:${payment.liability_id}`;
 
+    let bankId = "";
+    if (payment.asset_id) bankId = `asset:${payment.asset_id}`;
+    else if (payment.bank_id) bankId = `bank:${payment.bank_id}`;
+
     setNewPayment({
       date: payment.date,
       description: payment.description,
       amount: payment.amount.toString(),
       interest: payment.interest?.toString() || "",
-      bankId: payment.bank_id?.toString() || "",
+      bankId,
+      assetId: payment.asset_id?.toString() || "",
       creditId
     });
   };
@@ -135,6 +159,7 @@ export function Paiements() {
       amount: "",
       interest: "",
       bankId: "",
+      assetId: "",
       creditId: ""
     });
   };
@@ -258,9 +283,19 @@ export function Paiements() {
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
                   >
                     <option value="">Sélectionner un compte (optionnel)</option>
-                    {banks.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
+                    {banks.map(b => {
+                      const bankAssets = assets.filter(a => a.bank_id === b.id);
+                      if (bankAssets.length === 0) {
+                        return <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>;
+                      }
+                      return (
+                        <optgroup key={`bank-group-${b.id}`} label={b.name}>
+                          {bankAssets.map(a => (
+                            <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -325,7 +360,13 @@ export function Paiements() {
                     </tr>
                   ) : (
                     payments.map((payment) => {
-                      const bankName = banks.find(b => b.id === payment.bank_id)?.name;
+                      let bankName = "";
+                      if (payment.asset_id) {
+                        bankName = assets.find(a => a.id === payment.asset_id)?.name || "";
+                      } else if (payment.bank_id) {
+                        bankName = banks.find(b => b.id === payment.bank_id)?.name || "";
+                      }
+                      
                       const creditName = payment.credit_id 
                         ? credits.find(c => c.id === payment.credit_id)?.name 
                         : liabilities.find(l => l.id === payment.liability_id)?.name;

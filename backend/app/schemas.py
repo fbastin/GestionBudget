@@ -130,6 +130,7 @@ class ExpenseBase(BaseModel):
     description: str
     amount: float
     bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
     credit_id: Optional[int] = None
     liability_id: Optional[int] = None
 
@@ -141,6 +142,7 @@ class ExpenseUpdate(BaseModel):
     description: Optional[str] = None
     amount: Optional[float] = None
     bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
     credit_id: Optional[int] = None
     liability_id: Optional[int] = None
 
@@ -154,6 +156,7 @@ class PaymentBase(BaseModel):
     amount: float
     interest: float = 0.0
     bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
     credit_id: Optional[int] = None
     liability_id: Optional[int] = None
 
@@ -166,6 +169,7 @@ class PaymentUpdate(BaseModel):
     amount: Optional[float] = None
     interest: Optional[float] = None
     bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
     credit_id: Optional[int] = None
     liability_id: Optional[int] = None
 

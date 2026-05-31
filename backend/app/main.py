@@ -19,28 +19,33 @@ app.add_middleware(
 
 database.init_db()
 
-def apply_bank_impact(db: Session, bank_id: int, amount: float, date, multiplier: int = 1):
+def apply_bank_impact(db: Session, bank_id: Optional[int], amount: float, date, multiplier: int = 1, asset_id: Optional[int] = None):
     """
-    Apply or reverse (multiplier=-1) the impact of a payment/expense on a bank's balance.
-    If the bank has assets, only the 'main' one (Cash/Banque) is updated.
-    Otherwise, the bank.balance itself is updated.
+    Apply or reverse (multiplier=-1) the impact of a payment/expense.
+    If asset_id is provided, it is used directly.
+    Otherwise, if bank_id is provided, we try to find the 'main' asset of that bank.
     """
-    bank = db.query(models.Bank).filter(models.Bank.id == bank_id).first()
-    if not bank:
-        return
-
     impact = amount * multiplier
-    
     target_asset = None
-    if bank.assets:
-        # Priority 1: Type matches 'Banque', 'Cash', 'Liquidités'
-        target_asset = next((a for a in bank.assets if a.type in ['Banque', 'Cash', 'Liquidités', 'Checking', 'Chèque']), None)
-        if not target_asset:
-            # Priority 2: Name matches bank name
-            target_asset = next((a for a in bank.assets if bank.name.lower() in a.name.lower()), None)
-        if not target_asset:
-            # Priority 3: First asset
-            target_asset = bank.assets[0]
+
+    if asset_id:
+        target_asset = db.query(models.Asset).filter(models.Asset.id == asset_id).first()
+    elif bank_id:
+        bank = db.query(models.Bank).filter(models.Bank.id == bank_id).first()
+        if bank:
+            if bank.assets:
+                # Priority 1: Type matches 'Banque', 'Cash', 'Liquidités'
+                target_asset = next((a for a in bank.assets if a.type in ['Banque', 'Cash', 'Liquidités', 'Checking', 'Chèque']), None)
+                if not target_asset:
+                    # Priority 2: Name matches bank name
+                    target_asset = next((a for a in bank.assets if bank.name.lower() in a.name.lower()), None)
+                if not target_asset:
+                    # Priority 3: First asset
+                    target_asset = bank.assets[0]
+            else:
+                # No assets, update the bank balance column directly
+                bank.balance -= impact
+                return
 
     if target_asset:
         # Update snapshots of the target asset
@@ -53,9 +58,6 @@ def apply_bank_impact(db: Session, bank_id: int, amount: float, date, multiplier
             latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
             base = latest.amount if latest else 0
             db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
-    else:
-        # No assets, update the bank balance column
-        bank.balance -= impact
 
 @app.get('/')
 def read_root():
@@ -442,7 +444,7 @@ def create_expense(expense: schemas.ExpenseCreate, db: Session = Depends(databas
     
     # Impact calculations
     if expense.bank_id:
-        apply_bank_impact(db, expense.bank_id, expense.amount, expense.date)
+        apply_bank_impact(db, expense.bank_id, expense.amount, expense.date, asset_id=expense.asset_id)
 
     target_liability_id = expense.liability_id
     if not target_liability_id and expense.credit_id:
@@ -474,7 +476,7 @@ def update_expense(expense_id: int, expense_update: schemas.ExpenseUpdate, db: S
     
     # Reverse old impact (propagate backwards)
     if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1)
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1, asset_id=db_expense.asset_id)
     
     old_target_liability_id = db_expense.liability_id
     if not old_target_liability_id and db_expense.credit_id:
@@ -494,7 +496,7 @@ def update_expense(expense_id: int, expense_update: schemas.ExpenseUpdate, db: S
     
     # Apply new impact (propagate forwards)
     if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date)
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, asset_id=db_expense.asset_id)
 
     new_target_liability_id = db_expense.liability_id
     if not new_target_liability_id and db_expense.credit_id:
@@ -525,7 +527,7 @@ def delete_expense(expense_id: int, db: Session = Depends(database.get_db)):
     
     # Reverse impact (propagate)
     if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1)
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1, asset_id=db_expense.asset_id)
     
     target_liability_id = db_expense.liability_id
     if not target_liability_id and db_expense.credit_id:
@@ -553,7 +555,7 @@ def create_payment(payment: schemas.PaymentCreate, db: Session = Depends(databas
     
     # Impact calculations
     if payment.bank_id:
-        apply_bank_impact(db, payment.bank_id, payment.amount, payment.date)
+        apply_bank_impact(db, payment.bank_id, payment.amount, payment.date, asset_id=payment.asset_id)
                 
     target_liability_id = payment.liability_id
     if not target_liability_id and payment.credit_id:
@@ -585,7 +587,7 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     
     # Reverse old impact
     if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1)
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1, asset_id=db_payment.asset_id)
     
     target_liability_id = db_payment.liability_id
     if not target_liability_id and db_payment.credit_id:
@@ -606,7 +608,7 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     
     # Apply new impact
     if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date)
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, asset_id=db_payment.asset_id)
     
     new_target_liability_id = db_payment.liability_id
     if not new_target_liability_id and db_payment.credit_id:
@@ -638,7 +640,7 @@ def delete_payment(payment_id: int, db: Session = Depends(database.get_db)):
     
     # Reverse impact
     if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1)
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1, asset_id=db_payment.asset_id)
     
     target_liability_id = db_payment.liability_id
     if not target_liability_id and db_payment.credit_id:

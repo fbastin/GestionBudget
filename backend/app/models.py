@@ -92,10 +92,12 @@ class Expense(Base):
     description = Column(String)
     amount = Column(Float)
     bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     
     bank = relationship('Bank', back_populates='expenses')
+    asset = relationship('Asset')
     credit = relationship('Credit', back_populates='expenses')
     liability = relationship('Liability')
 
@@ -107,9 +109,11 @@ class Payment(Base):
     amount = Column(Float)
     interest = Column(Float, default=0.0)
     bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     
     bank = relationship('Bank')
+    asset = relationship('Asset')
     credit = relationship('Credit')
     liability = relationship('Liability')

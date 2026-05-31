@@ -34,6 +34,7 @@ import {
 export function Depenses() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
   const [credits, setCredits] = useState<any[]>([]);
   const [liabilities, setLiabilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,7 @@ export function Depenses() {
     description: "",
     amount: "",
     interest: "",
-    accountId: "", // format: "bank:ID" or "credit:ID" or "liability:ID"
+    accountId: "", // format: "bank:ID" or "asset:ID" or "credit:ID" or "liability:ID"
     isPayment: false,
     bankId: "",
     creditId: "",
@@ -56,10 +57,11 @@ export function Depenses() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [expensesRes, paymentsRes, banksRes, creditsRes, liabilitiesRes] = await Promise.all([
+      const [expensesRes, paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes] = await Promise.all([
         getExpenses(),
         getPayments(),
         getBanks(),
+        getAssets(),
         getCredits(),
         getLiabilities()
       ]);
@@ -71,6 +73,7 @@ export function Depenses() {
 
       setExpenses(combined);
       setBanks(banksRes.data);
+      setAssets(assetsRes.data);
       setCredits(creditsRes.data);
       setLiabilities(liabilitiesRes.data);
       setError(null);
@@ -94,6 +97,8 @@ export function Depenses() {
       if (newExpense.isPayment) {
         let credit_id = null;
         let liability_id = null;
+        let bank_id = null;
+        let asset_id = null;
 
         if (newExpense.creditId.startsWith("credit:")) {
           credit_id = parseInt(newExpense.creditId.split(":")[1]);
@@ -101,12 +106,21 @@ export function Depenses() {
           liability_id = parseInt(newExpense.creditId.split(":")[1]);
         }
 
+        if (newExpense.bankId.startsWith("bank:")) {
+            bank_id = parseInt(newExpense.bankId.split(":")[1]);
+        } else if (newExpense.bankId.startsWith("asset:")) {
+            asset_id = parseInt(newExpense.bankId.split(":")[1]);
+            const assetObj = assets.find(a => a.id === asset_id);
+            if (assetObj && assetObj.bank_id) bank_id = assetObj.bank_id;
+        }
+
         const payload = {
           date: newExpense.date,
           description: newExpense.description,
           amount: parseFloat(newExpense.amount),
           interest: parseFloat(newExpense.interest) || 0,
-          bank_id: newExpense.bankId ? parseInt(newExpense.bankId) : null,
+          bank_id,
+          asset_id,
           credit_id,
           liability_id
         };
@@ -118,35 +132,36 @@ export function Depenses() {
         }
       } else {
         let bank_id = null;
+        let asset_id = null;
         let credit_id = null;
         let liability_id = null;
 
         if (newExpense.accountId.startsWith("bank:")) {
           bank_id = parseInt(newExpense.accountId.split(":")[1]);
+        } else if (newExpense.accountId.startsWith("asset:")) {
+          asset_id = parseInt(newExpense.accountId.split(":")[1]);
+          const assetObj = assets.find(a => a.id === asset_id);
+          if (assetObj && assetObj.bank_id) bank_id = assetObj.bank_id;
         } else if (newExpense.accountId.startsWith("credit:")) {
           credit_id = parseInt(newExpense.accountId.split(":")[1]);
         } else if (newExpense.accountId.startsWith("liability:")) {
           liability_id = parseInt(newExpense.accountId.split(":")[1]);
         }
 
+        const payload = {
+          date: newExpense.date,
+          description: newExpense.description,
+          amount: parseFloat(newExpense.amount),
+          bank_id,
+          asset_id,
+          credit_id,
+          liability_id
+        };
+
         if (editingId && !isEditingPayment) {
-          await updateExpense(editingId, {
-            date: newExpense.date,
-            description: newExpense.description,
-            amount: parseFloat(newExpense.amount),
-            bank_id,
-            credit_id,
-            liability_id
-          });
+          await updateExpense(editingId, payload);
         } else {
-          await createExpense({
-            date: newExpense.date,
-            description: newExpense.description,
-            amount: parseFloat(newExpense.amount),
-            bank_id,
-            credit_id,
-            liability_id
-          });
+          await createExpense(payload);
         }
       }
 
@@ -178,6 +193,10 @@ export function Depenses() {
       if (item.credit_id) creditId = `credit:${item.credit_id}`;
       else if (item.liability_id) creditId = `liability:${item.liability_id}`;
 
+      let bankId = "";
+      if (item.asset_id) bankId = `asset:${item.asset_id}`;
+      else if (item.bank_id) bankId = `bank:${item.bank_id}`;
+
       setNewExpense({
         date: item.date,
         description: item.description,
@@ -185,13 +204,14 @@ export function Depenses() {
         interest: item.interest?.toString() || "",
         accountId: "",
         isPayment: true,
-        bankId: item.bank_id?.toString() || "",
+        bankId,
         creditId,
         liabilityId: ""
       });
     } else {
       let accountId = "";
-      if (item.bank_id) accountId = `bank:${item.bank_id}`;
+      if (item.asset_id) accountId = `asset:${item.asset_id}`;
+      else if (item.bank_id) accountId = `bank:${item.bank_id}`;
       else if (item.credit_id) accountId = `credit:${item.credit_id}`;
       else if (item.liability_id) accountId = `liability:${item.liability_id}`;
       
@@ -392,9 +412,19 @@ export function Depenses() {
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
                       >
                         <option value="">Sélectionner un compte (optionnel)</option>
-                        {banks.map(b => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
+                        {banks.map(b => {
+                          const bankAssets = assets.filter(a => a.bank_id === b.id);
+                          if (bankAssets.length === 0) {
+                            return <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>;
+                          }
+                          return (
+                            <optgroup key={`bank-group-${b.id}`} label={b.name}>
+                              {bankAssets.map(a => (
+                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                              ))}
+                            </optgroup>
+                          );
+                        })}
                       </select>
                     </div>
                   </div>
@@ -434,10 +464,20 @@ export function Depenses() {
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
                     >
                       <option value="">Sélectionner un compte (optionnel)</option>
-                      <optgroup label="Banques">
-                        {banks.map(b => (
-                          <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>
-                        ))}
+                      <optgroup label="Comptes Bancaires">
+                        {banks.map(b => {
+                          const bankAssets = assets.filter(a => a.bank_id === b.id);
+                          if (bankAssets.length === 0) {
+                            return <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>;
+                          }
+                          return (
+                            <optgroup key={`bank-inner-${b.id}`} label={`  ${b.name}`}>
+                              {bankAssets.map(a => (
+                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                              ))}
+                            </optgroup>
+                          );
+                        })}
                       </optgroup>
                       <optgroup label="Crédits">
                         {credits.map(c => (
@@ -493,17 +533,29 @@ export function Depenses() {
                     expenses.map((item) => {
                       let account = "";
                       if (item.type === 'payment') {
-                        const bankName = banks.find(b => b.id === item.bank_id)?.name;
+                        let bankName = "";
+                        if (item.asset_id) {
+                          bankName = assets.find(a => a.id === item.asset_id)?.name || "";
+                        } else if (item.bank_id) {
+                          bankName = banks.find(b => b.id === item.bank_id)?.name || "";
+                        }
+
                         const creditName = item.credit_id 
                           ? credits.find(c => c.id === item.credit_id)?.name 
                           : liabilities.find(l => l.id === item.liability_id)?.name;
                         account = `${bankName || 'Cash'} → ${creditName}`;
                       } else {
-                        account = item.bank_id 
-                          ? banks.find(b => b.id === item.bank_id)?.name 
-                          : (item.credit_id 
-                              ? credits.find(c => c.id === item.credit_id)?.name 
-                              : (item.liability_id ? liabilities.find(l => l.id === item.liability_id)?.name : 'N/A'));
+                        if (item.asset_id) {
+                          account = assets.find(a => a.id === item.asset_id)?.name || "";
+                        } else if (item.bank_id) {
+                          account = banks.find(b => b.id === item.bank_id)?.name || "";
+                        } else if (item.credit_id) {
+                          account = credits.find(c => c.id === item.credit_id)?.name || "";
+                        } else if (item.liability_id) {
+                          account = liabilities.find(l => l.id === item.liability_id)?.name || "";
+                        } else {
+                          account = "N/A";
+                        }
                       }
                       
                       return (
