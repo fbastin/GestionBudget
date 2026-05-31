@@ -19,6 +19,44 @@ app.add_middleware(
 
 database.init_db()
 
+def apply_bank_impact(db: Session, bank_id: int, amount: float, date, multiplier: int = 1):
+    """
+    Apply or reverse (multiplier=-1) the impact of a payment/expense on a bank's balance.
+    If the bank has assets, only the 'main' one (Cash/Banque) is updated.
+    Otherwise, the bank.balance itself is updated.
+    """
+    bank = db.query(models.Bank).filter(models.Bank.id == bank_id).first()
+    if not bank:
+        return
+
+    impact = amount * multiplier
+    
+    target_asset = None
+    if bank.assets:
+        # Priority 1: Type matches 'Banque', 'Cash', 'Liquidités'
+        target_asset = next((a for a in bank.assets if a.type in ['Banque', 'Cash', 'Liquidités', 'Checking', 'Chèque']), None)
+        if not target_asset:
+            # Priority 2: Name matches bank name
+            target_asset = next((a for a in bank.assets if bank.name.lower() in a.name.lower()), None)
+        if not target_asset:
+            # Priority 3: First asset
+            target_asset = bank.assets[0]
+
+    if target_asset:
+        # Update snapshots of the target asset
+        snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date >= date).all()
+        for s in snapshots:
+            s.amount -= impact
+        
+        exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date == date).first()
+        if not exact:
+            latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
+            base = latest.amount if latest else 0
+            db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
+    else:
+        # No assets, update the bank balance column
+        bank.balance -= impact
+
 @app.get('/')
 def read_root():
     return {'message': 'Welcome to your Finance Manager API'}
@@ -404,22 +442,8 @@ def create_expense(expense: schemas.ExpenseCreate, db: Session = Depends(databas
     
     # Impact calculations
     if expense.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == expense.bank_id).first()
-        if bank:
-            bank.balance -= expense.amount
-            for asset in bank.assets:
-                # Update all snapshots from this date onwards
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= expense.date).all()
-                for s in snapshots:
-                    s.amount -= expense.amount
-                
-                # If no snapshot exists for exactly this date, we might need to create one to establish the new base
-                exact_snapshot = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == expense.date).first()
-                if not exact_snapshot:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date < expense.date).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else bank.balance + expense.amount
-                    db.add(models.Snapshot(date=expense.date, asset_id=asset.id, amount=base - expense.amount))
-                    
+        apply_bank_impact(db, expense.bank_id, expense.amount, expense.date)
+
     target_liability_id = expense.liability_id
     if not target_liability_id and expense.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == expense.credit_id).first()
@@ -450,13 +474,7 @@ def update_expense(expense_id: int, expense_update: schemas.ExpenseUpdate, db: S
     
     # Reverse old impact (propagate backwards)
     if db_expense.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_expense.bank_id).first()
-        if bank:
-            bank.balance += db_expense.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_expense.date).all()
-                for s in snapshots:
-                    s.amount += db_expense.amount
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1)
     
     old_target_liability_id = db_expense.liability_id
     if not old_target_liability_id and db_expense.credit_id:
@@ -476,19 +494,7 @@ def update_expense(expense_id: int, expense_update: schemas.ExpenseUpdate, db: S
     
     # Apply new impact (propagate forwards)
     if db_expense.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_expense.bank_id).first()
-        if bank:
-            bank.balance -= db_expense.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_expense.date).all()
-                for s in snapshots:
-                    s.amount -= db_expense.amount
-                
-                exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == db_expense.date).first()
-                if not exact:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date < db_expense.date).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else bank.balance + db_expense.amount
-                    db.add(models.Snapshot(date=db_expense.date, asset_id=asset.id, amount=base - db_expense.amount))
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date)
 
     new_target_liability_id = db_expense.liability_id
     if not new_target_liability_id and db_expense.credit_id:
@@ -519,13 +525,8 @@ def delete_expense(expense_id: int, db: Session = Depends(database.get_db)):
     
     # Reverse impact (propagate)
     if db_expense.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_expense.bank_id).first()
-        if bank:
-            bank.balance += db_expense.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_expense.date).all()
-                for s in snapshots:
-                    s.amount += db_expense.amount
+        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1)
+    
     target_liability_id = db_expense.liability_id
     if not target_liability_id and db_expense.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == db_expense.credit_id).first()
@@ -552,20 +553,8 @@ def create_payment(payment: schemas.PaymentCreate, db: Session = Depends(databas
     
     # Impact calculations
     if payment.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == payment.bank_id).first()
-        if bank:
-            bank.balance -= payment.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= payment.date).all()
-                for s in snapshots:
-                    s.amount -= payment.amount
+        apply_bank_impact(db, payment.bank_id, payment.amount, payment.date)
                 
-                exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == payment.date).first()
-                if not exact:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date < payment.date).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else bank.balance + payment.amount
-                    db.add(models.Snapshot(date=payment.date, asset_id=asset.id, amount=base - payment.amount))
-                    
     target_liability_id = payment.liability_id
     if not target_liability_id and payment.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == payment.credit_id).first()
@@ -596,13 +585,8 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     
     # Reverse old impact
     if db_payment.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_payment.bank_id).first()
-        if bank:
-            bank.balance += db_payment.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_payment.date).all()
-                for s in snapshots:
-                    s.amount += db_payment.amount
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1)
+    
     target_liability_id = db_payment.liability_id
     if not target_liability_id and db_payment.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
@@ -622,19 +606,8 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     
     # Apply new impact
     if db_payment.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_payment.bank_id).first()
-        if bank:
-            bank.balance -= db_payment.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_payment.date).all()
-                for s in snapshots:
-                    s.amount -= db_payment.amount
-                
-                exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == db_payment.date).first()
-                if not exact:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date < db_payment.date).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else bank.balance + db_payment.amount
-                    db.add(models.Snapshot(date=db_payment.date, asset_id=asset.id, amount=base - db_payment.amount))
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date)
+    
     new_target_liability_id = db_payment.liability_id
     if not new_target_liability_id and db_payment.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
@@ -665,13 +638,8 @@ def delete_payment(payment_id: int, db: Session = Depends(database.get_db)):
     
     # Reverse impact
     if db_payment.bank_id:
-        bank = db.query(models.Bank).filter(models.Bank.id == db_payment.bank_id).first()
-        if bank:
-            bank.balance += db_payment.amount
-            for asset in bank.assets:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date >= db_payment.date).all()
-                for s in snapshots:
-                    s.amount += db_payment.amount
+        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1)
+    
     target_liability_id = db_payment.liability_id
     if not target_liability_id and db_payment.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()

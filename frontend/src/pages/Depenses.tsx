@@ -10,6 +10,7 @@ import {
   deletePayment,
   getBanks, 
   getCredits,
+  getLiabilities,
   exportExpensesCSV,
   importExpensesCSV
 } from "../api";

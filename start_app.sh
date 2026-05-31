@@ -23,6 +23,16 @@ echo "Application lancée !"
 echo "Backend: http://127.0.0.1:8000"
 echo "Frontend: http://localhost:5173"
 
+# Ouverture automatique du navigateur dès que le frontend est prêt
+(
+  echo "En attente du frontend..."
+  until curl -s http://localhost:5173 > /dev/null 2>&1; do
+    sleep 1
+  done
+  echo "Ouverture du navigateur..."
+  cmd.exe /c start http://localhost:5173 2>/dev/null || xdg-open http://localhost:5173 2>/dev/null
+) &
+
 # Attente de l"utilisateur
 trap "kill $BACKEND_PID $FRONTEND_PID" EXIT
 wait
