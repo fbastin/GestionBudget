@@ -5,6 +5,7 @@ import {
   updatePayment,
   deletePayment, 
   getBanks, 
+  getAssets,
   getCredits,
   getLiabilities
 } from "../api";
