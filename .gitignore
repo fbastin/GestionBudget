@@ -10,6 +10,7 @@ venv_*/
 
 # Database
 backend/finance.db
+backend/finance.db.bak-*
 
 # Excel and sensitive data
 *.xlsx

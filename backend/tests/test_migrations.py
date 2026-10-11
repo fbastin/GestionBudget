@@ -1,0 +1,84 @@
+import sqlite3
+
+import pytest
+from alembic.autogenerate import compare_metadata
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine, text
+
+from app import database, models
+
+HEAD = ScriptDirectory.from_config(database.alembic_config()).get_current_head()
+
+
+@pytest.fixture
+def other_database(tmp_path, monkeypatch):
+    """Point init_db at a separate database file."""
+    path = tmp_path / "finance.db"
+    engine = create_engine(f"sqlite:///{path}")
+    monkeypatch.setattr(database, "DB_PATH", str(path))
+    monkeypatch.setattr(database, "engine", engine)
+    yield path, engine
+    engine.dispose()
+
+
+def schema_differences(engine):
+    with engine.connect() as connection:
+        return compare_metadata(MigrationContext.configure(connection), models.Base.metadata)
+
+
+def revision(engine):
+    with engine.connect() as connection:
+        return MigrationContext.configure(connection).get_current_revision()
+
+
+def create_legacy_database(engine, snapshots):
+    """Database created before migrations existed: no version table, no unique snapshot indexes."""
+    models.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("DROP INDEX ux_snapshots_asset_date"))
+        connection.execute(text("DROP INDEX ux_snapshots_liability_date"))
+        connection.execute(text("INSERT INTO liabilities (id, name, type) VALUES (1, 'Visa', 'Carte')"))
+        for snapshot_id, day, amount in snapshots:
+            connection.execute(text("INSERT INTO snapshots (id, date, liability_id, amount) VALUES (:i, :d, 1, :a)"),
+                               {"i": snapshot_id, "d": day, "a": amount})
+
+
+def snapshot_ids(engine):
+    with engine.connect() as connection:
+        return connection.execute(text("SELECT id FROM snapshots ORDER BY id")).scalars().all()
+
+
+def test_a_new_database_gets_the_schema_of_the_models(other_database):
+    path, engine = other_database
+    database.init_db()
+    assert schema_differences(engine) == []
+    assert revision(engine) == HEAD
+    assert list(path.parent.glob("*.bak-*")) == []
+
+
+def test_an_existing_database_is_backed_up_then_migrated(other_database):
+    path, engine = other_database
+    create_legacy_database(engine, [(1, "2026-01-01", 1000), (2, "2026-01-01", 1000), (3, "2026-02-01", 1200)])
+    database.init_db()
+    assert schema_differences(engine) == []
+    assert revision(engine) == HEAD
+    assert snapshot_ids(engine) == [1, 3]  # identical duplicate removed
+    backups = list(path.parent.glob("finance.db.bak-*"))
+    assert len(backups) == 1
+    assert sqlite3.connect(backups[0]).execute("SELECT count(*) FROM snapshots").fetchone()[0] == 3
+
+
+def test_an_up_to_date_database_is_left_alone(other_database):
+    path, engine = other_database
+    database.init_db()
+    database.init_db()
+    assert list(path.parent.glob("*.bak-*")) == []
+
+
+def test_duplicates_with_different_amounts_stop_the_migration(other_database):
+    path, engine = other_database
+    create_legacy_database(engine, [(1, "2026-01-01", 1000), (2, "2026-01-01", 900)])
+    with pytest.raises(RuntimeError, match="ids 1,2"):
+        database.init_db()
+    assert snapshot_ids(engine) == [1, 2]
