@@ -56,6 +56,9 @@ export const getPayments = () => api.get("/payments");
 export const createPayment = (data: any) => api.post("/payments", data);
 export const updatePayment = (id: number, data: any) => api.patch("/payments/" + id, data);
 export const deletePayment = (id: number) => api.delete("/payments/" + id);
+// Replace an expense by a payment (or the reverse) in a single server-side operation
+export const convertExpenseToPayment = (id: number, data: any) => api.post(`/expenses/${id}/convert-to-payment`, data);
+export const convertPaymentToExpense = (id: number, data: any) => api.post(`/payments/${id}/convert-to-expense`, data);
 export const exportExpensesCSV = () => window.open(`${API_BASE_URL}/export/expenses/csv`, "_blank");
 export const importExpensesCSV = (file: File) => {
   const formData = new FormData();

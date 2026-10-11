@@ -25,6 +25,16 @@ bash start_app.sh
 
 L'application sera disponible sur [http://localhost:5173](http://localhost:5173).
 
+### Tests
+Les tests du backend utilisent une base temporaire : ils ne touchent jamais `backend/finance.db`.
+
+```bash
+cd backend
+source venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
+
 ## 📂 Structure du Projet
 
 - `/backend` : API Python, modèles de données et base de données SQLite.

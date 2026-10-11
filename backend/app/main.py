@@ -80,6 +80,45 @@ def apply_bank_impact(db: Session, bank_id: Optional[int], amount: float, date, 
                 base = latest.amount if latest else 0
                 db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
 
+def resolve_liability_id(db: Session, liability_id: Optional[int], credit_id: Optional[int]) -> Optional[int]:
+    """Debt affected by a transaction: the one chosen directly, otherwise the one behind the credit."""
+    if liability_id:
+        return liability_id
+    if credit_id:
+        credit = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
+        if credit:
+            return credit.liability_id
+    return None
+
+def apply_liability_impact(db: Session, liability_id: Optional[int], delta: float, date, create_snapshot: bool = True):
+    """Add delta to the debt's snapshots from date onwards and, when applying, make sure one exists at date."""
+    if not liability_id:
+        return
+    snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date >= date).all()
+    for s in snapshots:
+        s.amount += delta
+    if create_snapshot:
+        exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date == date).first()
+        if not exact:
+            latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
+            base = latest.amount if latest else 0
+            db.add(models.Snapshot(date=date, liability_id=liability_id, amount=base + delta))
+
+def apply_expense(db: Session, expense, multiplier: int = 1):
+    """Apply (multiplier=1) or reverse (-1) an expense: it leaves the bank account and adds to the debt."""
+    if expense.bank_id:
+        apply_bank_impact(db, expense.bank_id, expense.amount, expense.date, multiplier, asset_id=expense.asset_id)
+    liability_id = resolve_liability_id(db, expense.liability_id, expense.credit_id)
+    apply_liability_impact(db, liability_id, expense.amount * multiplier, expense.date, create_snapshot=multiplier > 0)
+
+def apply_payment(db: Session, payment, multiplier: int = 1):
+    """Apply (multiplier=1) or reverse (-1) a payment: it leaves the bank account and repays the capital of the debt."""
+    if payment.bank_id:
+        apply_bank_impact(db, payment.bank_id, payment.amount, payment.date, multiplier, asset_id=payment.asset_id)
+    liability_id = resolve_liability_id(db, payment.liability_id, payment.credit_id)
+    capital = payment.amount - (payment.interest or 0)
+    apply_liability_impact(db, liability_id, -capital * multiplier, payment.date, create_snapshot=multiplier > 0)
+
 @app.get('/')
 def read_root():
     return {'message': 'Welcome to your Finance Manager API'}
@@ -493,29 +532,7 @@ def get_expenses(db: Session = Depends(database.get_db)):
 def create_expense(expense: schemas.ExpenseCreate, db: Session = Depends(database.get_db)):
     db_expense = models.Expense(**expense.model_dump())
     db.add(db_expense)
-    
-    # Impact calculations
-    if expense.bank_id:
-        apply_bank_impact(db, expense.bank_id, expense.amount, expense.date, asset_id=expense.asset_id)
-
-    target_liability_id = expense.liability_id
-    if not target_liability_id and expense.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == expense.credit_id).first()
-        if credit:
-            target_liability_id = credit.liability_id
-
-    if target_liability_id:
-        # Update all snapshots from this date onwards
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= expense.date).all()
-        for s in snapshots:
-            s.amount += expense.amount
-            
-        exact_snapshot = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == expense.date).first()
-        if not exact_snapshot:
-            latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < expense.date).order_by(models.Snapshot.date.desc()).first()
-            base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=expense.date, liability_id=target_liability_id, amount=base + expense.amount))
-
+    apply_expense(db, db_expense)
     db.commit()
     db.refresh(db_expense)
     return db_expense
@@ -525,48 +542,10 @@ def update_expense(expense_id: int, expense_update: schemas.ExpenseUpdate, db: S
     db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(status_code=404, detail='Expense not found')
-    
-    # Reverse old impact (propagate backwards)
-    if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1, asset_id=db_expense.asset_id)
-    
-    old_target_liability_id = db_expense.liability_id
-    if not old_target_liability_id and db_expense.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_expense.credit_id).first()
-        if credit:
-            old_target_liability_id = credit.liability_id
-
-    if old_target_liability_id:
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == old_target_liability_id, models.Snapshot.date >= db_expense.date).all()
-        for s in snapshots:
-            s.amount -= db_expense.amount
-
-    # Update data
-    update_data = expense_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
+    apply_expense(db, db_expense, multiplier=-1)
+    for key, value in expense_update.model_dump(exclude_unset=True).items():
         setattr(db_expense, key, value)
-    
-    # Apply new impact (propagate forwards)
-    if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, asset_id=db_expense.asset_id)
-
-    new_target_liability_id = db_expense.liability_id
-    if not new_target_liability_id and db_expense.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_expense.credit_id).first()
-        if credit:
-            new_target_liability_id = credit.liability_id
-
-    if new_target_liability_id:
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date >= db_expense.date).all()
-        for s in snapshots:
-            s.amount += db_expense.amount
-                
-        exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date == db_expense.date).first()
-        if not exact:
-            latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date < db_expense.date).order_by(models.Snapshot.date.desc()).first()
-            base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=db_expense.date, liability_id=new_target_liability_id, amount=base + db_expense.amount))
-
+    apply_expense(db, db_expense)
     db.commit()
     db.refresh(db_expense)
     return db_expense
@@ -576,22 +555,7 @@ def delete_expense(expense_id: int, db: Session = Depends(database.get_db)):
     db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
     if not db_expense:
         raise HTTPException(status_code=404, detail='Expense not found')
-    
-    # Reverse impact (propagate)
-    if db_expense.bank_id:
-        apply_bank_impact(db, db_expense.bank_id, db_expense.amount, db_expense.date, multiplier=-1, asset_id=db_expense.asset_id)
-    
-    target_liability_id = db_expense.liability_id
-    if not target_liability_id and db_expense.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_expense.credit_id).first()
-        if credit:
-            target_liability_id = credit.liability_id
-
-    if target_liability_id:
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= db_expense.date).all()
-        for s in snapshots:
-            s.amount -= db_expense.amount
-
+    apply_expense(db, db_expense, multiplier=-1)
     db.delete(db_expense)
     db.commit()
     return {'message': 'Expense deleted'}
@@ -604,29 +568,7 @@ def get_payments(db: Session = Depends(database.get_db)):
 def create_payment(payment: schemas.PaymentCreate, db: Session = Depends(database.get_db)):
     db_payment = models.Payment(**payment.model_dump())
     db.add(db_payment)
-    
-    # Impact calculations
-    if payment.bank_id:
-        apply_bank_impact(db, payment.bank_id, payment.amount, payment.date, asset_id=payment.asset_id)
-                
-    target_liability_id = payment.liability_id
-    if not target_liability_id and payment.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == payment.credit_id).first()
-        if credit:
-            target_liability_id = credit.liability_id
-
-    if target_liability_id:
-        capital = payment.amount - payment.interest
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= payment.date).all()
-        for s in snapshots:
-            s.amount -= capital
-                
-        exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == payment.date).first()
-        if not exact:
-            latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < payment.date).order_by(models.Snapshot.date.desc()).first()
-            base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=payment.date, liability_id=target_liability_id, amount=base - capital))
-
+    apply_payment(db, db_payment)
     db.commit()
     db.refresh(db_payment)
     return db_payment
@@ -636,56 +578,10 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if not db_payment:
         raise HTTPException(status_code=404, detail='Payment not found')
-    
-    # Store old properties
-    old_bank_id = db_payment.bank_id
-    old_asset_id = db_payment.asset_id
-    old_amount = db_payment.amount
-    old_interest = db_payment.interest
-    old_date = db_payment.date
-    old_target_liability_id = db_payment.liability_id
-    if not old_target_liability_id and db_payment.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
-        if credit:
-            old_target_liability_id = credit.liability_id
-
-    # Reverse old impact
-    if old_bank_id:
-        apply_bank_impact(db, old_bank_id, old_amount, old_date, multiplier=-1, asset_id=old_asset_id)
-    
-    if old_target_liability_id:
-        capital = old_amount - old_interest
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == old_target_liability_id, models.Snapshot.date >= old_date).all()
-        for s in snapshots:
-            s.amount += capital
-
-    # Update data
-    update_data = payment_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
+    apply_payment(db, db_payment, multiplier=-1)
+    for key, value in payment_update.model_dump(exclude_unset=True).items():
         setattr(db_payment, key, value)
-    
-    # Apply new impact
-    if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, asset_id=db_payment.asset_id)
-    
-    new_target_liability_id = db_payment.liability_id
-    if not new_target_liability_id and db_payment.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
-        if credit:
-            new_target_liability_id = credit.liability_id
-
-    if new_target_liability_id:
-        capital = db_payment.amount - db_payment.interest
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date >= db_payment.date).all()
-        for s in snapshots:
-            s.amount -= capital
-                
-        exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date == db_payment.date).first()
-        if not exact:
-            latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == new_target_liability_id, models.Snapshot.date < db_payment.date).order_by(models.Snapshot.date.desc()).first()
-            base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=db_payment.date, liability_id=new_target_liability_id, amount=base - capital))
-
+    apply_payment(db, db_payment)
     db.commit()
     db.refresh(db_payment)
     return db_payment
@@ -695,26 +591,40 @@ def delete_payment(payment_id: int, db: Session = Depends(database.get_db)):
     db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
     if not db_payment:
         raise HTTPException(status_code=404, detail='Payment not found')
-    
-    # Reverse impact
-    if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1, asset_id=db_payment.asset_id)
-    
-    target_liability_id = db_payment.liability_id
-    if not target_liability_id and db_payment.credit_id:
-        credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
-        if credit:
-            target_liability_id = credit.liability_id
-
-    if target_liability_id:
-        capital = db_payment.amount - db_payment.interest
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= db_payment.date).all()
-        for s in snapshots:
-            s.amount += capital
-
+    apply_payment(db, db_payment, multiplier=-1)
     db.delete(db_payment)
     db.commit()
     return {'message': 'Payment deleted'}
+
+@app.post('/expenses/{expense_id}/convert-to-payment', response_model=schemas.Payment)
+def convert_expense_to_payment(expense_id: int, payment: schemas.PaymentCreate, db: Session = Depends(database.get_db)):
+    """Replace an expense by a payment in a single commit, so nothing is lost if it fails."""
+    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if not db_expense:
+        raise HTTPException(status_code=404, detail='Expense not found')
+    apply_expense(db, db_expense, multiplier=-1)
+    db.delete(db_expense)
+    db_payment = models.Payment(**payment.model_dump())
+    db.add(db_payment)
+    apply_payment(db, db_payment)
+    db.commit()
+    db.refresh(db_payment)
+    return db_payment
+
+@app.post('/payments/{payment_id}/convert-to-expense', response_model=schemas.Expense)
+def convert_payment_to_expense(payment_id: int, expense: schemas.ExpenseCreate, db: Session = Depends(database.get_db)):
+    """Replace a payment by an expense in a single commit, so nothing is lost if it fails."""
+    db_payment = db.query(models.Payment).filter(models.Payment.id == payment_id).first()
+    if not db_payment:
+        raise HTTPException(status_code=404, detail='Payment not found')
+    apply_payment(db, db_payment, multiplier=-1)
+    db.delete(db_payment)
+    db_expense = models.Expense(**expense.model_dump())
+    db.add(db_expense)
+    apply_expense(db, db_expense)
+    db.commit()
+    db.refresh(db_expense)
+    return db_expense
 
 @app.get('/export/expenses/csv')
 def export_expenses_csv(db: Session = Depends(database.get_db)):
@@ -746,6 +656,46 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
         
     return Response(content=output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename=expenses_export.csv'})
 
+def parse_csv_account(db: Session, account: str, is_payment: bool):
+    """(bank_id, credit_id, liability_id) from the Account column written by the export."""
+    bank_id = credit_id = liability_id = None
+    if is_payment:
+        # Format: "BankName -> TargetName"
+        if " -> " in account:
+            bank_part, target_part = account.split(" -> ", 1)
+            bank = db.query(models.Bank).filter(models.Bank.name == bank_part.strip()).first()
+            if bank:
+                bank_id = bank.id
+            credit = db.query(models.Credit).filter(models.Credit.name == target_part.strip()).first()
+            if credit:
+                credit_id = credit.id
+            else:
+                liability = db.query(models.Liability).filter(models.Liability.name == target_part.strip()).first()
+                if liability:
+                    liability_id = liability.id
+    elif account.startswith("Banque: "):
+        bank = db.query(models.Bank).filter(models.Bank.name == account.replace("Banque: ", "").strip()).first()
+        if bank:
+            bank_id = bank.id
+    elif account.startswith("Crédit: "):
+        credit = db.query(models.Credit).filter(models.Credit.name == account.replace("Crédit: ", "").strip()).first()
+        if credit:
+            credit_id = credit.id
+    elif account.startswith("Dette: "):
+        liability = db.query(models.Liability).filter(models.Liability.name == account.replace("Dette: ", "").strip()).first()
+        if liability:
+            liability_id = liability.id
+    return bank_id, credit_id, liability_id
+
+def count_recorded_transactions(db: Session, model, date, description: str, amount: float, interest: float, bank_id, liability_id) -> int:
+    """Transactions already recorded with these values, compared the way the CSV export writes them."""
+    return sum(
+        1 for t in db.query(model).filter(model.date == date).all()
+        if (t.description or '').strip() == description and round(t.amount, 2) == amount
+        and round(getattr(t, 'interest', 0) or 0, 2) == interest and t.bank_id == bank_id
+        and resolve_liability_id(db, t.liability_id, t.credit_id) == liability_id
+    )
+
 @app.post('/import/expenses/csv')
 async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
     content = await file.read()
@@ -757,6 +707,9 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
     reader = csv.DictReader(input_file)
     
     count = 0
+    skipped = 0
+    occurrences = {}
+    recorded = {}
     for row in reader:
         date_str = row.get('Date', '').strip()
         description = row.get('Description', '').strip()
@@ -775,111 +728,38 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
             date_val = datetime.strptime(clean_date_str, '%Y-%m-%d').date()
         except ValueError:
             continue
-            
-        bank_id = None
-        credit_id = None
-        liability_id = None
-        
-        if type_str == 'Remboursement':
-            # Format: "BankName -> TargetName"
-            if " -> " in account:
-                bank_part, target_part = account.split(" -> ", 1)
-                bank = db.query(models.Bank).filter(models.Bank.name == bank_part.strip()).first()
-                if bank:
-                    bank_id = bank.id
-                
-                credit = db.query(models.Credit).filter(models.Credit.name == target_part.strip()).first()
-                if credit:
-                    credit_id = credit.id
-                else:
-                    liability = db.query(models.Liability).filter(models.Liability.name == target_part.strip()).first()
-                    if liability:
-                        liability_id = liability.id
-            
-            db_payment = models.Payment(
-                date=date_val,
-                description=description,
-                amount=amount_val,
-                interest=interest_val,
-                bank_id=bank_id,
-                credit_id=credit_id,
-                liability_id=liability_id
-            )
-            db.add(db_payment)
 
-            if bank_id:
-                apply_bank_impact(db, bank_id, amount_val, date_val)
+        is_payment = type_str == 'Remboursement'
+        bank_id, credit_id, liability_id = parse_csv_account(db, account, is_payment)
 
-            target_liability_id = liability_id
-            if not target_liability_id and credit_id:
-                cr = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
-                if cr:
-                    target_liability_id = cr.liability_id
+        # Skip transactions already recorded (e.g. a file imported twice). Identical rows of the file are
+        # legitimate (two coffees the same day), so only as many occurrences as already recorded are skipped.
+        model = models.Payment if is_payment else models.Expense
+        key = (model, date_val, description, round(amount_val, 2), round(interest_val, 2) if is_payment else 0,
+               bank_id, resolve_liability_id(db, liability_id, credit_id))
+        if key not in recorded:
+            recorded[key] = count_recorded_transactions(db, *key)
+        occurrences[key] = occurrences.get(key, 0) + 1
+        if occurrences[key] <= recorded[key]:
+            skipped += 1
+            continue
 
-            if target_liability_id:
-                capital = amount_val - interest_val
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= date_val).all()
-                for s in snapshots:
-                    s.amount -= capital
-
-                exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == date_val).first()
-                if not exact:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < date_val).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else 0
-                    db.add(models.Snapshot(date=date_val, liability_id=target_liability_id, amount=base - capital))
+        fields = dict(date=date_val, description=description, amount=amount_val, bank_id=bank_id, credit_id=credit_id, liability_id=liability_id)
+        if is_payment:
+            transaction = models.Payment(interest=interest_val, **fields)
+            db.add(transaction)
+            apply_payment(db, transaction)
         else:
-            if account.startswith("Banque: "):
-                bank_name = account.replace("Banque: ", "").strip()
-                bank = db.query(models.Bank).filter(models.Bank.name == bank_name).first()
-                if bank:
-                    bank_id = bank.id
-            elif account.startswith("Crédit: "):
-                credit_name = account.replace("Crédit: ", "").strip()
-                credit = db.query(models.Credit).filter(models.Credit.name == credit_name).first()
-                if credit:
-                    credit_id = credit.id
-            elif account.startswith("Dette: "):
-                liability_name = account.replace("Dette: ", "").strip()
-                liability = db.query(models.Liability).filter(models.Liability.name == liability_name).first()
-                if liability:
-                    liability_id = liability.id
-                    
-            db_expense = models.Expense(
-                date=date_val,
-                description=description,
-                amount=amount_val,
-                bank_id=bank_id,
-                credit_id=credit_id,
-                liability_id=liability_id
-            )
-            db.add(db_expense)
-
-            if bank_id:
-                apply_bank_impact(db, bank_id, amount_val, date_val)
-
-            target_liability_id = liability_id
-            if not target_liability_id and credit_id:
-                cr = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
-                if cr:
-                    target_liability_id = cr.liability_id
-
-            if target_liability_id:
-                snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= date_val).all()
-                for s in snapshots:
-                    s.amount += amount_val
-
-                exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == date_val).first()
-                if not exact:
-                    latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < date_val).order_by(models.Snapshot.date.desc()).first()
-                    base = latest.amount if latest else 0
-                    db.add(models.Snapshot(date=date_val, liability_id=target_liability_id, amount=base + amount_val))
+            transaction = models.Expense(**fields)
+            db.add(transaction)
+            apply_expense(db, transaction)
 
         # autoflush is disabled: flush so the next rows see the snapshots created by this one
         db.flush()
         count += 1
-
+                
     db.commit()
-    return {'message': f'{count} transactions imported successfully'}
+    return {'message': f'{count} transaction(s) importée(s), {skipped} doublon(s) ignoré(s).'}
 
 @app.get('/export/csv')
 def export_csv(db: Session = Depends(database.get_db)):

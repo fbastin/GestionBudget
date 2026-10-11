@@ -13,7 +13,9 @@ import {
   getCredits,
   getLiabilities,
   exportExpensesCSV,
-  importExpensesCSV
+  importExpensesCSV,
+  convertExpenseToPayment,
+  convertPaymentToExpense
 } from "../api";
 import { todayLocal } from "../date";
 import { 
@@ -134,8 +136,7 @@ export function Depenses() {
           if (isEditingPayment) {
             await updatePayment(editingId, payload);
           } else {
-            await deleteExpense(editingId);
-            await createPayment(payload);
+            await convertExpenseToPayment(editingId, payload);
           }
         } else {
           await createPayment(payload);
@@ -172,8 +173,7 @@ export function Depenses() {
           if (!isEditingPayment) {
             await updateExpense(editingId, payload);
           } else {
-            await deletePayment(editingId);
-            await createExpense(payload);
+            await convertPaymentToExpense(editingId, payload);
           }
         } else {
           await createExpense(payload);
@@ -280,7 +280,8 @@ export function Depenses() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      await importExpensesCSV(file);
+      const res = await importExpensesCSV(file);
+      alert(res.data.message);
       fetchData();
     } catch (err) {
       alert("Erreur lors de l'importation.");

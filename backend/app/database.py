@@ -5,7 +5,8 @@ from sqlalchemy.orm import sessionmaker
 from .models import Base, Snapshot
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "finance.db")
+# FINANCE_DB_PATH lets the tests use a throwaway database instead of the real one
+DB_PATH = os.environ.get("FINANCE_DB_PATH", os.path.join(BASE_DIR, "finance.db"))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(
