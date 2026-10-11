@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities, addSnapshot, deleteSnapshot } from "../api";
+import { todayLocal } from "../date";
 import { CreditCard, Plus, Trash2, Save, X, Link as LinkIcon, Info, Edit2, History as HistoryIcon } from "lucide-react";
 
 interface Snapshot {
@@ -86,7 +87,7 @@ export function Credits() {
         await addSnapshot({
           liability_id: res.data.liability_id,
           amount: parseFloat(newItemAmount),
-          date: new Date().toISOString().split("T")[0],
+          date: todayLocal(),
         });
       }
 
@@ -150,7 +151,7 @@ export function Credits() {
     }
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocal();
 
   const totalBalance = credits.reduce((sum, c) => {
     const snapshots = c.liability?.snapshots || [];

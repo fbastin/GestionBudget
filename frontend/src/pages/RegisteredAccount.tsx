@@ -10,6 +10,7 @@ import {
   updateAsset, 
   deleteSnapshot 
 } from "../api";
+import { todayLocal } from "../date";
 import { 
   Landmark, 
   Plus, 
@@ -80,7 +81,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocal();
 
   const refreshData = async () => {
     setIsLoading(true);

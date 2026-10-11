@@ -11,7 +11,7 @@ app = FastAPI(title='Finance Manager API')
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
     allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -837,9 +837,11 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
                     latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < date_val).order_by(models.Snapshot.date.desc()).first()
                     base = latest.amount if latest else 0
                     db.add(models.Snapshot(date=date_val, liability_id=target_liability_id, amount=base + amount_val))
-            
+
+        # autoflush is disabled: flush so the next rows see the snapshots created by this one
+        db.flush()
         count += 1
-                
+
     db.commit()
     return {'message': f'{count} transactions imported successfully'}
 
@@ -913,7 +915,10 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
                 else:
                     db.add(models.Snapshot(liability_id=liability.id, amount=amount_val, date=date_val))
                 count += 1
-                
+
+        # autoflush is disabled: flush so a later row for the same item and date updates this snapshot
+        db.flush()
+
     db.commit()
     return {'message': f'{count} snapshots imported successfully'}
 

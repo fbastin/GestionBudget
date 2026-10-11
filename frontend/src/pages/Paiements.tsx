@@ -9,6 +9,7 @@ import {
   getCredits,
   getLiabilities
 } from "../api";
+import { todayLocal } from "../date";
 import { 
   HandCoins, 
   Plus, 
@@ -35,7 +36,7 @@ export function Paiements() {
   const [editingId, setEditingId] = useState<number | null>(null);
   
   const [newPayment, setNewPayment] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: todayLocal(),
     description: "",
     amount: "",
     interest: "",
@@ -77,10 +78,10 @@ export function Paiements() {
     if (!newPayment.description || !newPayment.amount || !newPayment.creditId) return;
 
     try {
-      let credit_id = null;
-      let liability_id = null;
-      let bank_id = null;
-      let asset_id = null;
+      let credit_id: number | null = null;
+      let liability_id: number | null = null;
+      let bank_id: number | null = null;
+      let asset_id: number | null = null;
 
       if (newPayment.creditId.startsWith("credit:")) {
         credit_id = parseInt(newPayment.creditId.split(":")[1]);
@@ -116,7 +117,7 @@ export function Paiements() {
         await createPayment(payload);
       }
       setNewPayment({
-        date: new Date().toISOString().split('T')[0],
+        date: todayLocal(),
         description: "",
         amount: "",
         interest: "",
@@ -155,7 +156,7 @@ export function Paiements() {
   const cancelEdit = () => {
     setEditingId(null);
     setNewPayment({
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       description: "",
       amount: "",
       interest: "",

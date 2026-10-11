@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from typing import List, Optional, Union
 from datetime import date as dt_date
 
@@ -10,6 +10,13 @@ class SnapshotBase(BaseModel):
 class SnapshotCreate(SnapshotBase):
     liability_id: Optional[int] = None
     asset_id: Optional[int] = None
+
+    @model_validator(mode='after')
+    def check_single_target(self):
+        # Without a target, the propagation queries match every snapshot with a NULL id
+        if (self.asset_id is None) == (self.liability_id is None):
+            raise ValueError('Exactly one of asset_id or liability_id is required')
+        return self
 
 class CreditBase(BaseModel):
     name: str

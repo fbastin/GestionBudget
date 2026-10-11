@@ -15,6 +15,7 @@ import {
   exportExpensesCSV,
   importExpensesCSV
 } from "../api";
+import { todayLocal } from "../date";
 import { 
   Receipt, 
   Plus, 
@@ -44,7 +45,7 @@ export function Depenses() {
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   
   const [newExpense, setNewExpense] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: todayLocal(),
     description: "",
     amount: "",
     interest: "",
@@ -96,10 +97,10 @@ export function Depenses() {
 
     try {
       if (newExpense.isPayment) {
-        let credit_id = null;
-        let liability_id = null;
-        let bank_id = null;
-        let asset_id = null;
+        let credit_id: number | null = null;
+        let liability_id: number | null = null;
+        let bank_id: number | null = null;
+        let asset_id: number | null = null;
 
         if (newExpense.creditId.startsWith("credit:")) {
           credit_id = parseInt(newExpense.creditId.split(":")[1]);
@@ -137,10 +138,10 @@ export function Depenses() {
           await createPayment(payload);
         }
       } else {
-        let bank_id = null;
-        let asset_id = null;
-        let credit_id = null;
-        let liability_id = null;
+        let bank_id: number | null = null;
+        let asset_id: number | null = null;
+        let credit_id: number | null = null;
+        let liability_id: number | null = null;
 
         if (newExpense.accountId.startsWith("bank:")) {
           bank_id = parseInt(newExpense.accountId.split(":")[1]);
@@ -177,7 +178,7 @@ export function Depenses() {
       }
 
       setNewExpense({
-        date: new Date().toISOString().split('T')[0],
+        date: todayLocal(),
         description: "",
         amount: "",
         interest: "",
@@ -244,7 +245,7 @@ export function Depenses() {
     setEditingId(null);
     setIsEditingPayment(false);
     setNewExpense({
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       description: "",
       amount: "",
       interest: "",

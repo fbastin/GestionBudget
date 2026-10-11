@@ -17,6 +17,7 @@ import {
   importCSV, 
   deleteSnapshot 
 } from "../api";
+import { todayLocal } from "../date";
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -115,7 +116,7 @@ export function ActifsPassifs() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = todayLocal();
 
   const refreshData = async () => {
     setIsLoading(true);
