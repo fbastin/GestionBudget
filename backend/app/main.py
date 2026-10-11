@@ -1,21 +1,41 @@
-from fastapi import FastAPI, Depends, HTTPException, Response, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from . import models, database, schemas
 import csv
 import io
+import re
 from datetime import datetime
 
 app = FastAPI(title='Finance Manager API')
 
+# The frontend is served locally by Vite, which moves to 5174, 5175... when 5173 is busy
+ALLOWED_ORIGIN_REGEX = r'http://(localhost|127\.0\.0\.1)(:\d+)?'
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173', 'http://127.0.0.1:5173'],
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+@app.middleware('http')
+async def reject_cross_site_writes(request: Request, call_next):
+    # CORS only hides responses from other websites: browsers still send their "simple" requests
+    # (e.g. a CSV upload form), so writes coming from any other origin are refused here
+    origin = request.headers.get('origin')
+    if request.method not in ('GET', 'HEAD', 'OPTIONS') and origin is not None and not re.fullmatch(ALLOWED_ORIGIN_REGEX, origin):
+        return JSONResponse(status_code=403, content={'detail': 'Origin not allowed'})
+    return await call_next(request)
+
+@app.exception_handler(IntegrityError)
+def handle_integrity_error(request: Request, exc: IntegrityError):
+    # Raised by the unique snapshot indexes when two requests write the same item and date at once
+    return JSONResponse(status_code=409, content={'detail': 'Conflit avec une modification simultanée, veuillez réessayer.'})
 
 database.init_db()
 
@@ -204,6 +224,14 @@ def delete_liability(liability_id: int, db: Session = Depends(database.get_db)):
 
 @app.post('/snapshots', response_model=schemas.SnapshotBase)
 def create_snapshot(snapshot: schemas.SnapshotCreate, db: Session = Depends(database.get_db)):
+    try:
+        return save_snapshot(db, snapshot)
+    except IntegrityError:
+        # A concurrent identical request (e.g. a double click) created this snapshot first: retrying updates it instead
+        db.rollback()
+        return save_snapshot(db, snapshot)
+
+def save_snapshot(db: Session, snapshot: schemas.SnapshotCreate):
     # Check if a snapshot already exists for this item on this date
     existing = None
     if snapshot.asset_id:
@@ -296,11 +324,18 @@ def update_bank(bank_id: int, bank_update: schemas.BankUpdate, db: Session = Dep
     db.refresh(db_bank)
     return db_bank
 
+def ensure_no_transactions(db: Session, column: str, value: int, label: str):
+    """Refuse to delete an account still used by transactions: their impact could no longer be reversed."""
+    count = sum(db.query(model).filter(getattr(model, column) == value).count() for model in (models.Expense, models.Payment))
+    if count:
+        raise HTTPException(status_code=409, detail=f"Impossible de supprimer {label} : {count} transaction(s) y sont liées. Supprimez-les ou changez leur compte d'abord.")
+
 @app.delete('/banks/{bank_id}')
 def delete_bank(bank_id: int, db: Session = Depends(database.get_db)):
     db_bank = db.query(models.Bank).filter(models.Bank.id == bank_id).first()
     if not db_bank:
         raise HTTPException(status_code=404, detail='Bank not found')
+    ensure_no_transactions(db, 'bank_id', bank_id, 'cette banque')
     db.delete(db_bank)
     db.commit()
     return {'message': 'Bank deleted'}
@@ -334,6 +369,7 @@ def delete_credit(credit_id: int, db: Session = Depends(database.get_db)):
     db_credit = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
     if not db_credit:
         raise HTTPException(status_code=404, detail='Credit not found')
+    ensure_no_transactions(db, 'credit_id', credit_id, 'ce crédit')
     db.delete(db_credit)
     db.commit()
     return {'message': 'Credit deleted'}

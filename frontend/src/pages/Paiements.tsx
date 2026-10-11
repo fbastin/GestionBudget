@@ -34,6 +34,7 @@ export function Paiements() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
   
   const [newPayment, setNewPayment] = useState({
     date: todayLocal(),
@@ -75,7 +76,9 @@ export function Paiements() {
 
   const handleAddPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPayment.description || !newPayment.amount || !newPayment.creditId) return;
+    // saving: ignore a second click while the first one is being saved (it would create a duplicate)
+    if (saving || !newPayment.description || !newPayment.amount || !newPayment.creditId) return;
+    setSaving(true);
 
     try {
       let credit_id: number | null = null;
@@ -129,6 +132,8 @@ export function Paiements() {
       fetchData();
     } catch (err) {
       alert("Erreur lors de l'enregistrement du paiement.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -327,7 +332,8 @@ export function Paiements() {
               </div>
               <button
                 type="submit"
-                className={`w-full py-3 ${editingId ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white rounded-xl font-bold transition-colors shadow-lg flex items-center justify-center gap-2 mt-4`}
+                disabled={saving}
+                className={`w-full py-3 ${editingId ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white rounded-xl font-bold transition-colors shadow-lg flex items-center justify-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {editingId ? <Pencil size={20} /> : <Plus size={20} />}
                 {editingId ? "Enregistrer les modifications" : "Ajouter"}

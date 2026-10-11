@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getBanks, createBank, deleteBank, updateBank, getAssets } from "../api";
+import { getBanks, createBank, deleteBank, updateBank, getAssets, errorMessage } from "../api";
 import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2 } from "lucide-react";
 
 interface Snapshot {
@@ -77,7 +77,7 @@ export function Banques() {
       await deleteBank(id);
       refreshData();
     } catch (err) {
-      alert("Erreur lors de la suppression");
+      alert(errorMessage(err, "Erreur lors de la suppression"));
     }
   };
 

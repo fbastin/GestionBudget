@@ -6,6 +6,12 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+// Message returned by the API (e.g. why a deletion is refused), or the fallback
+export const errorMessage = (err: unknown, fallback: string): string => {
+  const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined;
+  return typeof detail === "string" ? detail : fallback;
+};
+
 export const getDashboard = () => api.get("/dashboard");
 export const getLiabilities = () => api.get("/liabilities");
 export const getAssets = () => api.get("/assets");

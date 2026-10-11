@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities, addSnapshot, deleteSnapshot } from "../api";
+import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities, addSnapshot, deleteSnapshot, errorMessage } from "../api";
 import { todayLocal } from "../date";
 import { CreditCard, Plus, Trash2, Save, X, Link as LinkIcon, Info, Edit2, History as HistoryIcon } from "lucide-react";
 
@@ -147,7 +147,7 @@ export function Credits() {
       await deleteCredit(id);
       refreshData();
     } catch (err) {
-      alert("Erreur lors de la suppression");
+      alert(errorMessage(err, "Erreur lors de la suppression"));
     }
   };
 

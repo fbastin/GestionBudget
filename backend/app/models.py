@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, JSON, Index, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -36,6 +36,11 @@ class Liability(Base):
 
 class Snapshot(Base):
     __tablename__ = 'snapshots'
+    # At most one snapshot per item and date (partial indexes: the other id column is NULL)
+    __table_args__ = (
+        Index('ux_snapshots_asset_date', 'asset_id', 'date', unique=True, sqlite_where=text('asset_id IS NOT NULL')),
+        Index('ux_snapshots_liability_date', 'liability_id', 'date', unique=True, sqlite_where=text('liability_id IS NOT NULL')),
+    )
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date)
     asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
