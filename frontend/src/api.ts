@@ -1,7 +1,9 @@
 import axios from "axios";
 
+export const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000`;
+
 const api = axios.create({
-  baseURL: `http://${window.location.hostname}:8000`,
+  baseURL: API_BASE_URL,
 });
 
 export const getDashboard = () => api.get("/dashboard");
@@ -48,7 +50,7 @@ export const getPayments = () => api.get("/payments");
 export const createPayment = (data: any) => api.post("/payments", data);
 export const updatePayment = (id: number, data: any) => api.patch("/payments/" + id, data);
 export const deletePayment = (id: number) => api.delete("/payments/" + id);
-export const exportExpensesCSV = () => window.open(`http://${window.location.hostname}:8000/export/expenses/csv`, "_blank");
+export const exportExpensesCSV = () => window.open(`${API_BASE_URL}/export/expenses/csv`, "_blank");
 export const importExpensesCSV = (file: File) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -59,7 +61,7 @@ export const importExpensesCSV = (file: File) => {
   });
 };
 
-export const exportCSV = () => window.open(`http://${window.location.hostname}:8000/export/csv`, "_blank");
+export const exportCSV = () => window.open(`${API_BASE_URL}/export/csv`, "_blank");
 
 export const importCSV = (file: File) => {
   const formData = new FormData();

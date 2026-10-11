@@ -53,11 +53,12 @@ def apply_bank_impact(db: Session, bank_id: Optional[int], amount: float, date, 
         for s in snapshots:
             s.amount -= impact
         
-        exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date == date).first()
-        if not exact:
-            latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
-            base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
+        if multiplier > 0:
+            exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date == date).first()
+            if not exact:
+                latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
+                base = latest.amount if latest else 0
+                db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
 
 @app.get('/')
 def read_root():
@@ -95,7 +96,7 @@ def get_investments(db: Session = Depends(database.get_db)):
 
 @app.post('/investments', response_model=schemas.Investment)
 def create_investment(investment: schemas.InvestmentCreate, db: Session = Depends(database.get_db)):
-    db_investment = models.Investment(**investment.dict())
+    db_investment = models.Investment(**investment.model_dump())
     db.add(db_investment)
     db.commit()
     db.refresh(db_investment)
@@ -124,7 +125,7 @@ def delete_investment(investment_id: int, db: Session = Depends(database.get_db)
 
 @app.post('/assets', response_model=schemas.Asset)
 def create_asset(asset: schemas.AssetCreate, db: Session = Depends(database.get_db)):
-    db_asset = models.Asset(**asset.dict())
+    db_asset = models.Asset(**asset.model_dump())
     db.add(db_asset)
     db.commit()
     db.refresh(db_asset)
@@ -174,7 +175,7 @@ def get_liabilities(db: Session = Depends(database.get_db)):
 
 @app.post('/liabilities', response_model=schemas.Liability)
 def create_liability(liability: schemas.LiabilityCreate, db: Session = Depends(database.get_db)):
-    db_liability = models.Liability(**liability.dict())
+    db_liability = models.Liability(**liability.model_dump())
     db.add(db_liability)
     db.commit()
     db.refresh(db_liability)
@@ -241,7 +242,7 @@ def create_snapshot(snapshot: schemas.SnapshotCreate, db: Session = Depends(data
     for s in future:
         s.amount += delta
         
-    db_snapshot = models.Snapshot(**snapshot.dict())
+    db_snapshot = models.Snapshot(**snapshot.model_dump())
     db.add(db_snapshot)
     db.commit()
     db.refresh(db_snapshot)
@@ -252,6 +253,21 @@ def delete_snapshot(snapshot_id: int, db: Session = Depends(database.get_db)):
     db_snapshot = db.query(models.Snapshot).filter(models.Snapshot.id == snapshot_id).first()
     if not db_snapshot:
         raise HTTPException(status_code=404, detail='Snapshot not found')
+    
+    if db_snapshot.asset_id:
+        prev = db.query(models.Snapshot).filter(models.Snapshot.asset_id == db_snapshot.asset_id, models.Snapshot.date < db_snapshot.date).order_by(models.Snapshot.date.desc()).first()
+        base = prev.amount if prev else 0
+        delta = db_snapshot.amount - base
+        future = db.query(models.Snapshot).filter(models.Snapshot.asset_id == db_snapshot.asset_id, models.Snapshot.date > db_snapshot.date).all()
+    else:
+        prev = db.query(models.Snapshot).filter(models.Snapshot.liability_id == db_snapshot.liability_id, models.Snapshot.date < db_snapshot.date).order_by(models.Snapshot.date.desc()).first()
+        base = prev.amount if prev else 0
+        delta = db_snapshot.amount - base
+        future = db.query(models.Snapshot).filter(models.Snapshot.liability_id == db_snapshot.liability_id, models.Snapshot.date > db_snapshot.date).all()
+
+    for s in future:
+        s.amount -= delta
+
     db.delete(db_snapshot)
     db.commit()
     return {'message': 'Snapshot deleted'}
@@ -262,7 +278,7 @@ def get_banks(db: Session = Depends(database.get_db)):
 
 @app.post('/banks', response_model=schemas.Bank)
 def create_bank(bank: schemas.BankCreate, db: Session = Depends(database.get_db)):
-    db_bank = models.Bank(**bank.dict())
+    db_bank = models.Bank(**bank.model_dump())
     db.add(db_bank)
     db.commit()
     db.refresh(db_bank)
@@ -295,7 +311,7 @@ def get_credits(db: Session = Depends(database.get_db)):
 
 @app.post('/credits', response_model=schemas.Credit)
 def create_credit(credit: schemas.CreditCreate, db: Session = Depends(database.get_db)):
-    db_credit = models.Credit(**credit.dict())
+    db_credit = models.Credit(**credit.model_dump())
     db.add(db_credit)
     db.commit()
     db.refresh(db_credit)
@@ -328,7 +344,7 @@ def get_contributions(db: Session = Depends(database.get_db)):
 
 @app.post('/contributions', response_model=schemas.Contribution)
 def create_contribution(contribution: schemas.ContributionCreate, db: Session = Depends(database.get_db)):
-    db_contribution = models.Contribution(**contribution.dict())
+    db_contribution = models.Contribution(**contribution.model_dump())
     db.add(db_contribution)
     db.commit()
     db.refresh(db_contribution)
@@ -439,7 +455,7 @@ def get_expenses(db: Session = Depends(database.get_db)):
 
 @app.post('/expenses', response_model=schemas.Expense)
 def create_expense(expense: schemas.ExpenseCreate, db: Session = Depends(database.get_db)):
-    db_expense = models.Expense(**expense.dict())
+    db_expense = models.Expense(**expense.model_dump())
     db.add(db_expense)
     
     # Impact calculations
@@ -550,7 +566,7 @@ def get_payments(db: Session = Depends(database.get_db)):
 
 @app.post('/payments', response_model=schemas.Payment)
 def create_payment(payment: schemas.PaymentCreate, db: Session = Depends(database.get_db)):
-    db_payment = models.Payment(**payment.dict())
+    db_payment = models.Payment(**payment.model_dump())
     db.add(db_payment)
     
     # Impact calculations
@@ -585,19 +601,25 @@ def update_payment(payment_id: int, payment_update: schemas.PaymentUpdate, db: S
     if not db_payment:
         raise HTTPException(status_code=404, detail='Payment not found')
     
-    # Reverse old impact
-    if db_payment.bank_id:
-        apply_bank_impact(db, db_payment.bank_id, db_payment.amount, db_payment.date, multiplier=-1, asset_id=db_payment.asset_id)
-    
-    target_liability_id = db_payment.liability_id
-    if not target_liability_id and db_payment.credit_id:
+    # Store old properties
+    old_bank_id = db_payment.bank_id
+    old_asset_id = db_payment.asset_id
+    old_amount = db_payment.amount
+    old_interest = db_payment.interest
+    old_date = db_payment.date
+    old_target_liability_id = db_payment.liability_id
+    if not old_target_liability_id and db_payment.credit_id:
         credit = db.query(models.Credit).filter(models.Credit.id == db_payment.credit_id).first()
         if credit:
-            target_liability_id = credit.liability_id
+            old_target_liability_id = credit.liability_id
 
-    if target_liability_id:
-        capital = db_payment.amount - db_payment.interest
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= db_payment.date).all()
+    # Reverse old impact
+    if old_bank_id:
+        apply_bank_impact(db, old_bank_id, old_amount, old_date, multiplier=-1, asset_id=old_asset_id)
+    
+    if old_target_liability_id:
+        capital = old_amount - old_interest
+        snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == old_target_liability_id, models.Snapshot.date >= old_date).all()
         for s in snapshots:
             s.amount += capital
 
@@ -691,18 +713,21 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
 @app.post('/import/expenses/csv')
 async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
     content = await file.read()
-    decoded = content.decode('utf-8')
+    try:
+        decoded = content.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        decoded = content.decode('latin-1')
     input_file = io.StringIO(decoded)
     reader = csv.DictReader(input_file)
     
     count = 0
     for row in reader:
-        date_str = row.get('Date')
-        description = row.get('Description')
-        amount = row.get('Amount')
+        date_str = row.get('Date', '').strip()
+        description = row.get('Description', '').strip()
+        amount = row.get('Amount', '').strip()
         interest = row.get('Interest', 0)
-        account = row.get('Account', "")
-        type_str = row.get('Type', 'Dépense')
+        account = row.get('Account', '').strip()
+        type_str = row.get('Type', 'Dépense').strip()
         
         if not date_str or not description or not amount:
             continue
@@ -710,7 +735,8 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
         try:
             amount_val = float(amount)
             interest_val = float(interest) if interest else 0.0
-            date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
+            clean_date_str = date_str.split('T')[0].split(' ')[0]
+            date_val = datetime.strptime(clean_date_str, '%Y-%m-%d').date()
         except ValueError:
             continue
             
@@ -722,15 +748,15 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
             # Format: "BankName -> TargetName"
             if " -> " in account:
                 bank_part, target_part = account.split(" -> ", 1)
-                bank = db.query(models.Bank).filter(models.Bank.name == bank_part).first()
+                bank = db.query(models.Bank).filter(models.Bank.name == bank_part.strip()).first()
                 if bank:
                     bank_id = bank.id
                 
-                credit = db.query(models.Credit).filter(models.Credit.name == target_part).first()
+                credit = db.query(models.Credit).filter(models.Credit.name == target_part.strip()).first()
                 if credit:
                     credit_id = credit.id
                 else:
-                    liability = db.query(models.Liability).filter(models.Liability.name == target_part).first()
+                    liability = db.query(models.Liability).filter(models.Liability.name == target_part.strip()).first()
                     if liability:
                         liability_id = liability.id
             
@@ -744,21 +770,40 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
                 liability_id=liability_id
             )
             db.add(db_payment)
-            # Note: We don't trigger the balance update logic here for simplicity,
-            # mirroring the previous behavior of the expense importer.
+
+            if bank_id:
+                apply_bank_impact(db, bank_id, amount_val, date_val)
+
+            target_liability_id = liability_id
+            if not target_liability_id and credit_id:
+                cr = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
+                if cr:
+                    target_liability_id = cr.liability_id
+
+            if target_liability_id:
+                capital = amount_val - interest_val
+                snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= date_val).all()
+                for s in snapshots:
+                    s.amount -= capital
+
+                exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == date_val).first()
+                if not exact:
+                    latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < date_val).order_by(models.Snapshot.date.desc()).first()
+                    base = latest.amount if latest else 0
+                    db.add(models.Snapshot(date=date_val, liability_id=target_liability_id, amount=base - capital))
         else:
             if account.startswith("Banque: "):
-                bank_name = account.replace("Banque: ", "")
+                bank_name = account.replace("Banque: ", "").strip()
                 bank = db.query(models.Bank).filter(models.Bank.name == bank_name).first()
                 if bank:
                     bank_id = bank.id
             elif account.startswith("Crédit: "):
-                credit_name = account.replace("Crédit: ", "")
+                credit_name = account.replace("Crédit: ", "").strip()
                 credit = db.query(models.Credit).filter(models.Credit.name == credit_name).first()
                 if credit:
                     credit_id = credit.id
             elif account.startswith("Dette: "):
-                liability_name = account.replace("Dette: ", "")
+                liability_name = account.replace("Dette: ", "").strip()
                 liability = db.query(models.Liability).filter(models.Liability.name == liability_name).first()
                 if liability:
                     liability_id = liability.id
@@ -772,6 +817,26 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
                 liability_id=liability_id
             )
             db.add(db_expense)
+
+            if bank_id:
+                apply_bank_impact(db, bank_id, amount_val, date_val)
+
+            target_liability_id = liability_id
+            if not target_liability_id and credit_id:
+                cr = db.query(models.Credit).filter(models.Credit.id == credit_id).first()
+                if cr:
+                    target_liability_id = cr.liability_id
+
+            if target_liability_id:
+                snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date >= date_val).all()
+                for s in snapshots:
+                    s.amount += amount_val
+
+                exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date == date_val).first()
+                if not exact:
+                    latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == target_liability_id, models.Snapshot.date < date_val).order_by(models.Snapshot.date.desc()).first()
+                    base = latest.amount if latest else 0
+                    db.add(models.Snapshot(date=date_val, liability_id=target_liability_id, amount=base + amount_val))
             
         count += 1
                 
@@ -803,16 +868,19 @@ def export_csv(db: Session = Depends(database.get_db)):
 @app.post('/import/csv')
 async def import_csv(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
     content = await file.read()
-    decoded = content.decode('utf-8')
+    try:
+        decoded = content.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        decoded = content.decode('latin-1')
     input_file = io.StringIO(decoded)
     reader = csv.DictReader(input_file)
     
     count = 0
     for row in reader:
-        category = row.get('Category')
-        name = row.get('Name')
-        amount = row.get('Amount')
-        date_str = row.get('Date')
+        category = row.get('Category', '').strip()
+        name = row.get('Name', '').strip()
+        amount = row.get('Amount', '').strip()
+        date_str = row.get('Date', '').strip()
         
         if not category or not name or not amount:
             continue
@@ -820,7 +888,8 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
         try:
             amount_val = float(amount)
             if date_str:
-                date_val = datetime.strptime(date_str, '%Y-%m-%d').date()
+                clean_date_str = date_str.split('T')[0].split(' ')[0]
+                date_val = datetime.strptime(clean_date_str, '%Y-%m-%d').date()
             else:
                 date_val = datetime.now().date()
         except ValueError:
@@ -829,7 +898,6 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
         if category.lower() == 'asset':
             asset = db.query(models.Asset).filter(models.Asset.name == name).first()
             if asset:
-                # Check if snapshot already exists for this date
                 existing = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == date_val).first()
                 if existing:
                     existing.amount = amount_val

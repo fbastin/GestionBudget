@@ -126,8 +126,13 @@ export function Depenses() {
           liability_id
         };
 
-        if (editingId && isEditingPayment) {
-          await updatePayment(editingId, payload);
+        if (editingId) {
+          if (isEditingPayment) {
+            await updatePayment(editingId, payload);
+          } else {
+            await deleteExpense(editingId);
+            await createPayment(payload);
+          }
         } else {
           await createPayment(payload);
         }
@@ -159,8 +164,13 @@ export function Depenses() {
           liability_id
         };
 
-        if (editingId && !isEditingPayment) {
-          await updateExpense(editingId, payload);
+        if (editingId) {
+          if (!isEditingPayment) {
+            await updateExpense(editingId, payload);
+          } else {
+            await deletePayment(editingId);
+            await createExpense(payload);
+          }
         } else {
           await createExpense(payload);
         }

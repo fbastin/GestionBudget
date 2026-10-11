@@ -52,9 +52,9 @@ export function Investissements() {
       // Filter assets that are likely to hold investments
       const investmentAssets = assetsRes.data.filter((a: Asset) => 
         ["CELI", "REER", "Bourse", "Investissement"].some(type => 
-          a.type.toUpperCase().includes(type.toUpperCase()) || 
+          (a.type && a.type.toUpperCase().includes(type.toUpperCase())) || 
           (a.location && a.location.toUpperCase().includes(type.toUpperCase())) ||
-          a.name.toUpperCase().includes(type.toUpperCase())
+          (a.name && a.name.toUpperCase().includes(type.toUpperCase()))
         )
       );
       setAssets(investmentAssets);

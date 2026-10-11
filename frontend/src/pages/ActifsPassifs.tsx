@@ -148,7 +148,7 @@ export function ActifsPassifs() {
   const handleUpdateLiability = async (id: number) => {
     try {
       await updateLiability(id, { name: editName, type: editType });
-      if (editAmount !== "") {
+      if (editAmount !== "" && !isNaN(parseFloat(editAmount))) {
         await addSnapshot({
           liability_id: id,
           amount: parseFloat(editAmount),
@@ -169,9 +169,9 @@ export function ActifsPassifs() {
         type: editType, 
         location: editLocation,
         bank_id: editBankId === "" ? null : parseInt(editBankId),
-        details: { value: editFixedValue === "" ? null : parseFloat(editFixedValue) }
+        details: { value: editFixedValue === "" ? null : (isNaN(parseFloat(editFixedValue)) ? null : parseFloat(editFixedValue)) }
       });
-      if (editAmount !== "") {
+      if (editAmount !== "" && !isNaN(parseFloat(editAmount))) {
         await addSnapshot({
           asset_id: id,
           amount: parseFloat(editAmount),

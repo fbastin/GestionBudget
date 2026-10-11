@@ -93,6 +93,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
       ]);
       setContributions(contRes.data.filter((c: Contribution) => c.type === type));
       setAssets(assetsRes.data.filter((a: Asset) => 
+        (a.type && a.type.toUpperCase().includes(type)) ||
         (a.location && a.location.toUpperCase().includes(type)) || 
         a.name.toUpperCase().includes(type)
       ));
@@ -118,7 +119,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         bank_id: editBankId === "" ? null : parseInt(editBankId),
         details: { value: editFixedValue === "" ? null : parseFloat(editFixedValue) }
       });
-      if (editAssetAmount !== "") {
+      if (editAssetAmount !== "" && !isNaN(parseFloat(editAssetAmount))) {
         await addSnapshot({
           asset_id: id,
           amount: parseFloat(editAssetAmount),
@@ -152,10 +153,10 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   };
 
   const handleAdd = async () => {
-    if (!newAmount) return;
+    if (!newAmount || isNaN(parseFloat(newAmount))) return;
     try {
       await createContribution({
-        year: parseInt(newYear),
+        year: parseInt(newYear) || new Date().getFullYear(),
         type: type,
         amount: parseFloat(newAmount),
         institution: newInstitution
@@ -172,8 +173,8 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   const handleUpdate = async (id: number) => {
     try {
       await updateContribution(id, {
-        year: parseInt(editYear),
-        amount: parseFloat(editAmount),
+        year: parseInt(editYear) || new Date().getFullYear(),
+        amount: parseFloat(editAmount) || 0,
         institution: editInstitution
       });
       setEditingId(null);
