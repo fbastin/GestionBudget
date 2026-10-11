@@ -10,6 +10,7 @@ import {
   getLiabilities
 } from "../api";
 import { todayLocal } from "../date";
+import type { Asset, Bank, Credit, Liability, Payment } from "../types";
 import { 
   HandCoins, 
   Plus, 
@@ -26,11 +27,11 @@ import {
 } from "lucide-react";
 
 export function Paiements() {
-  const [payments, setPayments] = useState<any[]>([]);
-  const [banks, setBanks] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [credits, setCredits] = useState<any[]>([]);
-  const [liabilities, setLiabilities] = useState<any[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [credits, setCredits] = useState<Credit[]>([]);
+  const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -46,32 +47,36 @@ export function Paiements() {
     creditId: ""
   });
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getPayments(),
+      getBanks(),
+      getAssets(),
+      getCredits(),
+      getLiabilities()
+    ])
+      .then(([paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes]) => {
+        setPayments(paymentsRes.data);
+        setBanks(banksRes.data);
+        setAssets(assetsRes.data);
+        setCredits(creditsRes.data);
+        setLiabilities(liabilitiesRes.data);
+        setError(null);
+      })
+      .catch((err) => {
+        setError("Erreur lors du chargement des données.");
+        console.error(err);
+      })
+      .finally(() => setLoading(false));
+
   const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes] = await Promise.all([
-        getPayments(),
-        getBanks(),
-        getAssets(),
-        getCredits(),
-        getLiabilities()
-      ]);
-      setPayments(paymentsRes.data);
-      setBanks(banksRes.data);
-      setAssets(assetsRes.data);
-      setCredits(creditsRes.data);
-      setLiabilities(liabilitiesRes.data);
-      setError(null);
-    } catch (err) {
-      setError("Erreur lors du chargement des données.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    await loadData();
   };
 
   useEffect(() => {
-    fetchData();
+    loadData();
   }, []);
 
   const handleAddPayment = async (e: React.FormEvent) => {
@@ -130,14 +135,14 @@ export function Paiements() {
       });
       setEditingId(null);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'enregistrement du paiement.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (payment: any) => {
+  const handleEdit = (payment: Payment) => {
     setEditingId(payment.id);
     let creditId = "";
     if (payment.credit_id) creditId = `credit:${payment.credit_id}`;
@@ -176,7 +181,7 @@ export function Paiements() {
     try {
       await deletePayment(id);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression.");
     }
   };

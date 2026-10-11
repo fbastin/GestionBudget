@@ -50,26 +50,30 @@ export function Credits() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getCredits(),
+      getLiabilities()
+    ])
+      .then(([creditsRes, liabilitiesRes]) => {
+        setCredits(creditsRes.data);
+        setLiabilities(liabilitiesRes.data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch credits:", err);
+        setError("Erreur de chargement des crédits.");
+      })
+      .finally(() => setIsLoading(false));
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const [creditsRes, liabilitiesRes] = await Promise.all([
-        getCredits(),
-        getLiabilities()
-      ]);
-      setCredits(creditsRes.data);
-      setLiabilities(liabilitiesRes.data);
-    } catch (err) {
-      console.error("Failed to fetch credits:", err);
-      setError("Erreur de chargement des crédits.");
-    } finally {
-      setIsLoading(false);
-    }
+    await loadData();
   };
 
   useEffect(() => {
-    refreshData();
+    loadData();
   }, []);
 
   const handleAdd = async () => {
@@ -99,7 +103,7 @@ export function Credits() {
       setNewLiabilityId("");
       setNewItemAmount("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout du crédit");
     }
   };
@@ -126,7 +130,7 @@ export function Credits() {
 
       setEditingId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la mise à jour");
     }
   };
@@ -136,7 +140,7 @@ export function Credits() {
     try {
       await deleteSnapshot(sid);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression du relevé");
     }
   };

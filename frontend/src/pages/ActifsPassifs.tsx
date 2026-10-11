@@ -18,6 +18,7 @@ import {
   deleteSnapshot 
 } from "../api";
 import { todayLocal } from "../date";
+import type { AssetDetails } from "../types";
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -69,7 +70,7 @@ interface Asset {
   type: string;
   location?: string;
   bank_id?: number;
-  details?: any;
+  details?: AssetDetails | null;
   snapshots: Snapshot[];
 }
 
@@ -118,32 +119,36 @@ export function ActifsPassifs() {
 
   const todayStr = todayLocal();
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getDashboard(),
+      getLiabilities(),
+      getAssets(),
+      getHistory(),
+      getBanks()
+    ])
+      .then(([dashRes, liabRes, assetRes, histRes, bankRes]) => {
+        setDashboard(dashRes.data);
+        setLiabilities(liabRes.data);
+        setAssets(assetRes.data);
+        setHistory(histRes.data);
+        setBanks(bankRes.data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch data:", err);
+        setError(`Impossible de charger les données (${err instanceof Error ? err.message : 'Erreur inconnue'}).`);
+      })
+      .finally(() => setIsLoading(false));
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const [dashRes, liabRes, assetRes, histRes, bankRes] = await Promise.all([
-        getDashboard(),
-        getLiabilities(),
-        getAssets(),
-        getHistory(),
-        getBanks()
-      ]);
-      setDashboard(dashRes.data);
-      setLiabilities(liabRes.data);
-      setAssets(assetRes.data);
-      setHistory(histRes.data);
-      setBanks(bankRes.data);
-    } catch (err: any) {
-      console.error("Failed to fetch data:", err);
-      setError(`Impossible de charger les données (${err.message || 'Erreur inconnue'}).`);
-    } finally {
-      setIsLoading(false);
-    }
+    await loadData();
   };
 
   useEffect(() => {
-    refreshData();
+    loadData();
   }, []);
 
   const handleUpdateLiability = async (id: number) => {
@@ -158,7 +163,7 @@ export function ActifsPassifs() {
       }
       setEditingMetadataId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la modification");
     }
   };
@@ -181,7 +186,7 @@ export function ActifsPassifs() {
       }
       setEditingAssetMetadataId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la modification");
     }
   };
@@ -191,7 +196,7 @@ export function ActifsPassifs() {
     try {
       await deleteSnapshot(sid);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression du relevé");
     }
   };
@@ -212,7 +217,7 @@ export function ActifsPassifs() {
       setNewItemType("");
       setNewItemAmount("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout de la dette");
     }
   };
@@ -222,7 +227,7 @@ export function ActifsPassifs() {
     try {
       await deleteLiability(id);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression");
     }
   };
@@ -250,7 +255,7 @@ export function ActifsPassifs() {
       setNewItemBankId("");
       setNewItemAmount("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout de l'actif");
     }
   };
@@ -259,7 +264,7 @@ export function ActifsPassifs() {
     try {
       await updateAsset(assetId, { bank_id: bankId === "" ? null : parseInt(bankId) });
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la liaison à la banque");
     }
   };
@@ -269,7 +274,7 @@ export function ActifsPassifs() {
     try {
       await deleteAsset(id);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression");
     }
   };
@@ -281,7 +286,7 @@ export function ActifsPassifs() {
       await importCSV(file);
       refreshData();
       alert("Importation réussie");
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'importation");
     }
   };
@@ -386,7 +391,7 @@ export function ActifsPassifs() {
                 />
                 <Tooltip 
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                  formatter={(value: any) => [`${Number(value).toLocaleString()} $`, 'Valeur Nette']}
+                  formatter={(value) => [`${Number(value).toLocaleString()} $`, 'Valeur Nette']}
                 />
                 <Line 
                   type="monotone" 

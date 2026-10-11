@@ -36,26 +36,30 @@ export function Banques() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getBanks(),
+      getAssets()
+    ])
+      .then(([banksRes, assetsRes]) => {
+        setBanks(banksRes.data);
+        setAssets(assetsRes.data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch banks:", err);
+        setError("Erreur de chargement des données bancaires.");
+      })
+      .finally(() => setIsLoading(false));
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const [banksRes, assetsRes] = await Promise.all([
-        getBanks(),
-        getAssets()
-      ]);
-      setBanks(banksRes.data);
-      setAssets(assetsRes.data);
-    } catch (err) {
-      console.error("Failed to fetch banks:", err);
-      setError("Erreur de chargement des données bancaires.");
-    } finally {
-      setIsLoading(false);
-    }
+    await loadData();
   };
 
   useEffect(() => {
-    refreshData();
+    loadData();
   }, []);
 
   const handleAdd = async () => {
@@ -66,7 +70,7 @@ export function Banques() {
       setNewName("");
       setNewBalance("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout de la banque");
     }
   };
@@ -89,7 +93,7 @@ export function Banques() {
       });
       setEditingId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la mise à jour");
     }
   };

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getAssets, getInvestments, createInvestment, updateInvestment, deleteInvestment } from "../api";
+import type { AssetDetails } from "../types";
 import { TrendingUp, Plus, Trash2, Save, X, Building2, BarChart3, Wallet, Edit2 } from "lucide-react";
 
 interface Investment {
@@ -17,7 +18,7 @@ interface Asset {
   type: string;
   location?: string;
   investments: Investment[];
-  details?: any;
+  details?: AssetDetails | null;
 }
 
 export function Investissements() {
@@ -41,34 +42,38 @@ export function Investissements() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getAssets(),
+      getInvestments()
+    ])
+      .then(([assetsRes, invRes]) => {
+        // Filter assets that are likely to hold investments
+        const investmentAssets = assetsRes.data.filter((a: Asset) => 
+          ["CELI", "REER", "Bourse", "Investissement"].some(type => 
+            (a.type && a.type.toUpperCase().includes(type.toUpperCase())) || 
+            (a.location && a.location.toUpperCase().includes(type.toUpperCase())) ||
+            (a.name && a.name.toUpperCase().includes(type.toUpperCase()))
+          )
+        );
+        setAssets(investmentAssets);
+        setInvestments(invRes.data);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch investments:", err);
+        setError("Erreur de chargement des investissements.");
+      })
+      .finally(() => setIsLoading(false));
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const [assetsRes, invRes] = await Promise.all([
-        getAssets(),
-        getInvestments()
-      ]);
-      // Filter assets that are likely to hold investments
-      const investmentAssets = assetsRes.data.filter((a: Asset) => 
-        ["CELI", "REER", "Bourse", "Investissement"].some(type => 
-          (a.type && a.type.toUpperCase().includes(type.toUpperCase())) || 
-          (a.location && a.location.toUpperCase().includes(type.toUpperCase())) ||
-          (a.name && a.name.toUpperCase().includes(type.toUpperCase()))
-        )
-      );
-      setAssets(investmentAssets);
-      setInvestments(invRes.data);
-    } catch (err) {
-      console.error("Failed to fetch investments:", err);
-      setError("Erreur de chargement des investissements.");
-    } finally {
-      setIsLoading(false);
-    }
+    await loadData();
   };
 
   useEffect(() => {
-    refreshData();
+    loadData();
   }, []);
 
   const handleAdd = async () => {
@@ -91,7 +96,7 @@ export function Investissements() {
       setNewAssetId("");
       setNewCurrentPrice("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout");
     }
   };
@@ -107,7 +112,7 @@ export function Investissements() {
       });
       setEditingId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la mise à jour");
     }
   };
@@ -117,7 +122,7 @@ export function Investissements() {
     try {
       await deleteInvestment(id);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression");
     }
   };

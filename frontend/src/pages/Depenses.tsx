@@ -18,6 +18,7 @@ import {
   convertPaymentToExpense
 } from "../api";
 import { todayLocal } from "../date";
+import type { Asset, Bank, Credit, Expense, Liability, Payment } from "../types";
 import { 
   Receipt, 
   Plus, 
@@ -35,12 +36,15 @@ import {
   TrendingDown
 } from "lucide-react";
 
+// Expenses and payments shown in a single list
+type Transaction = (Expense & { type: "expense" }) | (Payment & { type: "payment" });
+
 export function Depenses() {
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [banks, setBanks] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  const [credits, setCredits] = useState<any[]>([]);
-  const [liabilities, setLiabilities] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Transaction[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [credits, setCredits] = useState<Credit[]>([]);
+  const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -59,39 +63,42 @@ export function Depenses() {
     liabilityId: ""
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [expensesRes, paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes] = await Promise.all([
-        getExpenses(),
-        getPayments(),
-        getBanks(),
-        getAssets(),
-        getCredits(),
-        getLiabilities()
-      ]);
-      
-      const combined = [
-        ...expensesRes.data.map((e: any) => ({ ...e, type: 'expense' })),
-        ...paymentsRes.data.map((p: any) => ({ ...p, type: 'payment' }))
-      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = () =>
+    Promise.all([
+      getExpenses(),
+      getPayments(),
+      getBanks(),
+      getAssets(),
+      getCredits(),
+      getLiabilities()
+    ])
+      .then(([expensesRes, paymentsRes, banksRes, assetsRes, creditsRes, liabilitiesRes]) => {
+        const combined = [
+          ...expensesRes.data.map((e: Expense) => ({ ...e, type: 'expense' as const })),
+          ...paymentsRes.data.map((p: Payment) => ({ ...p, type: 'payment' as const }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-      setExpenses(combined);
-      setBanks(banksRes.data);
-      setAssets(assetsRes.data);
-      setCredits(creditsRes.data);
-      setLiabilities(liabilitiesRes.data);
-      setError(null);
-    } catch (err) {
-      setError("Erreur lors du chargement des données.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+        setExpenses(combined);
+        setBanks(banksRes.data);
+        setAssets(assetsRes.data);
+        setCredits(creditsRes.data);
+        setLiabilities(liabilitiesRes.data);
+        setError(null);
+      })
+      .catch((err) => {
+        setError("Erreur lors du chargement des données.");
+        console.error(err);
+      })
+      .finally(() => setLoading(false));
+
+  const fetchData = async () => {
+    setLoading(true);
+    await loadData();
   };
 
   useEffect(() => {
-    fetchData();
+    loadData();
   }, []);
 
   const handleAddExpense = async (e: React.FormEvent) => {
@@ -194,14 +201,14 @@ export function Depenses() {
       setEditingId(null);
       setIsEditingPayment(false);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'enregistrement.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (item: any) => {
+  const handleEdit = (item: Transaction) => {
     setEditingId(item.id);
     setIsEditingPayment(item.type === 'payment');
     
@@ -262,7 +269,7 @@ export function Depenses() {
     });
   };
 
-  const handleDelete = async (item: any) => {
+  const handleDelete = async (item: Transaction) => {
     if (!confirm(`Supprimer cette ${item.type === 'payment' ? 'transaction' : 'dépense'} ?`)) return;
     try {
       if (item.type === 'payment') {
@@ -271,7 +278,7 @@ export function Depenses() {
         await deleteExpense(item.id);
       }
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression.");
     }
   };
@@ -283,7 +290,7 @@ export function Depenses() {
       const res = await importExpensesCSV(file);
       alert(res.data.message);
       fetchData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'importation.");
     }
   };
@@ -550,7 +557,7 @@ export function Depenses() {
                     </tr>
                   ) : (
                     expenses.map((item) => {
-                      let account = "";
+                      let account: string;
                       if (item.type === 'payment') {
                         let bankName = "";
                         if (item.asset_id) {

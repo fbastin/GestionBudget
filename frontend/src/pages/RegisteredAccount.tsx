@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { 
   getContributions, 
   createContribution, 
@@ -11,6 +11,7 @@ import {
   deleteSnapshot 
 } from "../api";
 import { todayLocal } from "../date";
+import type { AssetDetails } from "../types";
 import { 
   Landmark, 
   Plus, 
@@ -36,7 +37,7 @@ interface Asset {
   type: string;
   location?: string;
   bank_id?: number;
-  details?: any;
+  details?: AssetDetails | null;
   snapshots: Snapshot[];
 }
 
@@ -83,33 +84,37 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
 
   const todayStr = todayLocal();
 
+  // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
+  const loadData = useCallback(() =>
+    Promise.all([
+      getContributions(),
+      getAssets(),
+      getBanks()
+    ])
+      .then(([contRes, assetsRes, banksRes]) => {
+        setContributions(contRes.data.filter((c: Contribution) => c.type === type));
+        setAssets(assetsRes.data.filter((a: Asset) => 
+          (a.type && a.type.toUpperCase().includes(type)) ||
+          (a.location && a.location.toUpperCase().includes(type)) || 
+          a.name.toUpperCase().includes(type)
+        ));
+        setBanks(banksRes.data);
+      })
+      .catch((err) => {
+        console.error(`Failed to fetch ${type} data:`, err);
+        setError(`Erreur de chargement des données ${type}.`);
+      })
+      .finally(() => setIsLoading(false)), [type]);
+
   const refreshData = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const [contRes, assetsRes, banksRes] = await Promise.all([
-        getContributions(),
-        getAssets(),
-        getBanks()
-      ]);
-      setContributions(contRes.data.filter((c: Contribution) => c.type === type));
-      setAssets(assetsRes.data.filter((a: Asset) => 
-        (a.type && a.type.toUpperCase().includes(type)) ||
-        (a.location && a.location.toUpperCase().includes(type)) || 
-        a.name.toUpperCase().includes(type)
-      ));
-      setBanks(banksRes.data);
-    } catch (err) {
-      console.error(`Failed to fetch ${type} data:`, err);
-      setError(`Erreur de chargement des données ${type}.`);
-    } finally {
-      setIsLoading(false);
-    }
+    await loadData();
   };
 
   useEffect(() => {
-    refreshData();
-  }, [type]);
+    loadData();
+  }, [loadData]);
 
   const handleUpdateAsset = async (id: number) => {
     try {
@@ -129,7 +134,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
       }
       setEditingMetadataId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la modification");
     }
   };
@@ -139,7 +144,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
     try {
       await deleteSnapshot(sid);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression du relevé");
     }
   };
@@ -148,7 +153,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
     try {
       await updateAsset(assetId, { bank_id: bankId === "" ? null : parseInt(bankId) });
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la liaison à la banque");
     }
   };
@@ -166,7 +171,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
       setNewAmount("");
       setNewInstitution("");
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de l'ajout");
     }
   };
@@ -180,7 +185,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
       });
       setEditingId(null);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la mise à jour");
     }
   };
@@ -190,7 +195,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
     try {
       await deleteContribution(id);
       refreshData();
-    } catch (err) {
+    } catch {
       alert("Erreur lors de la suppression");
     }
   };

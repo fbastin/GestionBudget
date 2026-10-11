@@ -19,8 +19,8 @@ function App() {
           <Route path="/investissements" element={<Investissements />} />
           <Route path="/banques" element={<Banques />} />
           <Route path="/credits" element={<Credits />} />
-          <Route path="/celi" element={<RegisteredAccount type="CELI" />} />
-          <Route path="/reer" element={<RegisteredAccount type="REER" />} />
+          <Route path="/celi" element={<RegisteredAccount key="CELI" type="CELI" />} />
+          <Route path="/reer" element={<RegisteredAccount key="REER" type="REER" />} />
         </Route>
       </Routes>
     </BrowserRouter>
