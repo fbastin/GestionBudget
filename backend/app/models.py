@@ -1,8 +1,28 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, JSON, Index, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import TypeDecorator
 
 Base = declarative_base()
+
+def to_cents(value):
+    """Round an amount to the cent, half up (2.675 -> 2.68, which round() would give as 2.67)."""
+    if value is None:
+        return None
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+class Money(TypeDecorator):
+    """Amount in dollars, stored and read rounded to the cent, so float errors never accumulate in the database."""
+    impl = Float
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        return to_cents(value)
+
+    def process_result_value(self, value, dialect):
+        return to_cents(value)
 
 class Asset(Base):
     __tablename__ = 'assets'
@@ -45,7 +65,7 @@ class Snapshot(Base):
     date = Column(Date)
     asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
-    amount = Column(Float)
+    amount = Column(Money)
     asset = relationship('Asset', back_populates='snapshots')
     liability = relationship('Liability', back_populates='snapshots')
 
@@ -62,7 +82,7 @@ class Contribution(Base):
     id = Column(Integer, primary_key=True, index=True)
     year = Column(Integer)
     type = Column(String)
-    amount = Column(Float)
+    amount = Column(Money)
     institution = Column(String)
 
 class BudgetCategory(Base):
@@ -76,7 +96,7 @@ class Credit(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     type = Column(String)
-    limit = Column(Float, nullable=True)
+    limit = Column(Money, nullable=True)
     interest_rate = Column(Float, nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     liability = relationship('Liability', back_populates='credits')
@@ -86,7 +106,7 @@ class Bank(Base):
     __tablename__ = 'banks'
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    balance = Column(Float, default=0.0)
+    balance = Column(Money, default=0.0)
     assets = relationship('Asset', back_populates='bank')
     expenses = relationship('Expense', back_populates='bank')
 
@@ -95,7 +115,7 @@ class Expense(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date)
     description = Column(String)
-    amount = Column(Float)
+    amount = Column(Money)
     bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
     asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)
@@ -111,8 +131,8 @@ class Payment(Base):
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date)
     description = Column(String)
-    amount = Column(Float)
-    interest = Column(Float, default=0.0)
+    amount = Column(Money)
+    interest = Column(Money, default=0.0)
     bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
     asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     credit_id = Column(Integer, ForeignKey('credits.id'), nullable=True)

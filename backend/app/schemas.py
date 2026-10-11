@@ -1,10 +1,15 @@
-from pydantic import BaseModel, ConfigDict, model_validator
-from typing import List, Optional, Union
+from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
+from typing import Annotated, List, Optional, Union
 from datetime import date as dt_date
+from .models import to_cents
+
+# Amount in dollars, rounded to the cent on input like in the database (2.675 -> 2.68), so a transaction
+# moves the balances by exactly the amount it is stored with
+Money = Annotated[float, AfterValidator(to_cents)]
 
 class SnapshotBase(BaseModel):
     date: dt_date
-    amount: float
+    amount: Money
     model_config = ConfigDict(from_attributes=True)
 
 class SnapshotCreate(SnapshotBase):
@@ -21,7 +26,7 @@ class SnapshotCreate(SnapshotBase):
 class CreditBase(BaseModel):
     name: str
     type: str
-    limit: Optional[float] = None
+    limit: Optional[Money] = None
     interest_rate: Optional[float] = None
     liability_id: Optional[int] = None
 
@@ -31,7 +36,7 @@ class CreditCreate(CreditBase):
 class CreditUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
-    limit: Optional[float] = None
+    limit: Optional[Money] = None
     interest_rate: Optional[float] = None
     liability_id: Optional[int] = None
 
@@ -119,14 +124,14 @@ class HistoryItem(BaseModel):
 
 class BankBase(BaseModel):
     name: str
-    balance: float = 0.0
+    balance: Money = 0.0
 
 class BankCreate(BankBase):
     pass
 
 class BankUpdate(BaseModel):
     name: Optional[str] = None
-    balance: Optional[float] = None
+    balance: Optional[Money] = None
 
 class Bank(BankBase):
     id: int
@@ -135,7 +140,7 @@ class Bank(BankBase):
 class ExpenseBase(BaseModel):
     date: dt_date
     description: str
-    amount: float
+    amount: Money
     bank_id: Optional[int] = None
     asset_id: Optional[int] = None
     credit_id: Optional[int] = None
@@ -147,7 +152,7 @@ class ExpenseCreate(ExpenseBase):
 class ExpenseUpdate(BaseModel):
     date: Optional[dt_date] = None
     description: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[Money] = None
     bank_id: Optional[int] = None
     asset_id: Optional[int] = None
     credit_id: Optional[int] = None
@@ -160,8 +165,8 @@ class Expense(ExpenseBase):
 class PaymentBase(BaseModel):
     date: dt_date
     description: str
-    amount: float
-    interest: float = 0.0
+    amount: Money
+    interest: Money = 0.0
     bank_id: Optional[int] = None
     asset_id: Optional[int] = None
     credit_id: Optional[int] = None
@@ -173,8 +178,8 @@ class PaymentCreate(PaymentBase):
 class PaymentUpdate(BaseModel):
     date: Optional[dt_date] = None
     description: Optional[str] = None
-    amount: Optional[float] = None
-    interest: Optional[float] = None
+    amount: Optional[Money] = None
+    interest: Optional[Money] = None
     bank_id: Optional[int] = None
     asset_id: Optional[int] = None
     credit_id: Optional[int] = None
@@ -188,7 +193,7 @@ class ContributionBase(BaseModel):
 
     year: int
     type: str
-    amount: float
+    amount: Money
     institution: Optional[str] = None
 
 class ContributionCreate(ContributionBase):
@@ -197,7 +202,7 @@ class ContributionCreate(ContributionBase):
 class ContributionUpdate(BaseModel):
     year: Optional[int] = None
     type: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[Money] = None
     institution: Optional[str] = None
 
 class Contribution(ContributionBase):

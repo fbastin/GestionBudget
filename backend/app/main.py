@@ -492,9 +492,9 @@ def get_history(db: Session = Depends(database.get_db)):
         
         history.append({
             'date': d,
-            'assets': float(total_assets),
-            'liabilities': float(total_liabilities),
-            'net_worth': float(total_assets - total_liabilities)
+            'assets': models.to_cents(total_assets),
+            'liabilities': models.to_cents(total_liabilities),
+            'net_worth': models.to_cents(total_assets - total_liabilities)
         })
         
     return history
@@ -519,9 +519,9 @@ def get_dashboard(db: Session = Depends(database.get_db)):
             total_assets += float(a.details['value'])
             
     return {
-        'total_assets': float(total_assets),
-        'total_liabilities': float(total_liabilities),
-        'net_worth': float(total_assets - total_liabilities)
+        'total_assets': models.to_cents(total_assets),
+        'total_liabilities': models.to_cents(total_liabilities),
+        'net_worth': models.to_cents(total_assets - total_liabilities)
     }
 
 @app.get('/expenses', response_model=List[schemas.Expense])
@@ -722,8 +722,8 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
             continue
             
         try:
-            amount_val = float(amount)
-            interest_val = float(interest) if interest else 0.0
+            amount_val = models.to_cents(float(amount))
+            interest_val = models.to_cents(float(interest)) if interest else 0.0
             clean_date_str = date_str.split('T')[0].split(' ')[0]
             date_val = datetime.strptime(clean_date_str, '%Y-%m-%d').date()
         except ValueError:
@@ -804,7 +804,7 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
             continue
             
         try:
-            amount_val = float(amount)
+            amount_val = models.to_cents(float(amount))
             if date_str:
                 clean_date_str = date_str.split('T')[0].split(' ')[0]
                 date_val = datetime.strptime(clean_date_str, '%Y-%m-%d').date()

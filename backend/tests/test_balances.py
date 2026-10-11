@@ -152,3 +152,19 @@ def test_a_conversion_that_fails_midway_keeps_the_original(client, accounts, mon
     assert [e["id"] for e in client.get("/expenses").json()] == [expense["id"]]
     assert client.get("/payments").json() == []
     assert balances(client, "liabilities", accounts["debt"]) == before
+
+
+def test_amounts_are_kept_to_the_cent(client):
+    debt = create(client, "/liabilities", name="Marge", type="Ligne de crédit")
+    create(client, "/snapshots", date="2026-01-01", amount=0.1, liability_id=debt["id"])
+    create(client, "/expenses", date="2026-01-01", description="x", amount=0.2, liability_id=debt["id"])
+    # Plain floats would give 0.30000000000000004
+    assert [s["amount"] for s in item_snapshots(client, "liabilities", debt["id"])] == [0.3]
+
+    # A half cent is rounded up on input, and the balance moves by the stored amount
+    expense = create(client, "/expenses", date="2026-01-02", description="y", amount=2.675, liability_id=debt["id"])
+    assert expense["amount"] == 2.68
+    assert [s["amount"] for s in item_snapshots(client, "liabilities", debt["id"])] == [0.3, 2.98]
+    assert client.get("/dashboard").json()["total_liabilities"] == 2.98
+    client.delete(f"/expenses/{expense['id']}")
+    assert [s["amount"] for s in item_snapshots(client, "liabilities", debt["id"])] == [0.3, 0.3]

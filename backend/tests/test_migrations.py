@@ -59,11 +59,13 @@ def test_a_new_database_gets_the_schema_of_the_models(other_database):
 
 def test_an_existing_database_is_backed_up_then_migrated(other_database):
     path, engine = other_database
-    create_legacy_database(engine, [(1, "2026-01-01", 1000), (2, "2026-01-01", 1000), (3, "2026-02-01", 1200)])
+    create_legacy_database(engine, [(1, "2026-01-01", 1000), (2, "2026-01-01", 1000), (3, "2026-02-01", 3349.1899999999996)])
     database.init_db()
     assert schema_differences(engine) == []
     assert revision(engine) == HEAD
     assert snapshot_ids(engine) == [1, 3]  # identical duplicate removed
+    # Read without the Money type: the stored value itself is rounded
+    assert sqlite3.connect(path).execute("SELECT amount FROM snapshots WHERE id = 3").fetchone()[0] == 3349.19
     backups = list(path.parent.glob("finance.db.bak-*"))
     assert len(backups) == 1
     assert sqlite3.connect(backups[0]).execute("SELECT count(*) FROM snapshots").fetchone()[0] == 3
