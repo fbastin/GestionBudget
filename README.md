@@ -40,7 +40,7 @@ Les tests du backend utilisent une base temporaire : ils ne touchent jamais `bac
 
 ```bash
 cd backend
-source venv/bin/activate
+source venv_linux/bin/activate
 pip install -r requirements-dev.txt
 pytest
 ```

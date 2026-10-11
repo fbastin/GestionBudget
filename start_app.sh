@@ -8,7 +8,7 @@ python3 clean_ports.py
 echo "Démarrage du backend..."
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$BASE_DIR/backend"
-source venv/bin/activate
+source venv_linux/bin/activate
 export PYTHONPATH=$PYTHONPATH:.
 uvicorn app.main:app --reload --reload-dir app --port 8000 --host 127.0.0.1 &
 BACKEND_PID=$!
