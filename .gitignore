@@ -28,3 +28,8 @@ dist/
 # Vite
 frontend/dist/
 frontend/node_modules/
+
+# Rapprochement avec les sources personnelles (backend/reconcile.py) : noms et montants
+backend/reconcile_config.json
+backend/reconcile_report.md
+ROADMAP_SYNCHRO.md

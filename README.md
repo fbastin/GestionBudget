@@ -61,6 +61,40 @@ L'application est en ligne sur [https://slashbin.net/budget/](https://slashbin.n
 - **Suivre le service** : `systemctl --user status budget.service` et `journalctl --user -u budget.service`.
 - **Développer en local** : `systemctl --user stop budget.service`, puis `bash start_app.sh`. Redémarrer le service ensuite.
 
+## 🔄 Rapprochement avec les sources externes
+
+`backend/reconcile.py` compare la base à des sources tenues ailleurs et signale les écarts. Les deux sources sont facultatives :
+
+- **un classeur de dettes** (`.xlsx`, local ou récupéré avec [rclone](https://rclone.org/) depuis Google Drive, OneDrive…) : un bloc de lignes, une dette par ligne, son nom dans une colonne et son solde actuel dans une autre ;
+- **un relevé de positions de courtier** (`.csv`) : le plus récent des fichiers d'un dossier qui suivent un motif. Par défaut, le relevé de positions de Wealthsimple (`holdings-report-AAAA-MM-JJ.csv`). La valeur marchande de chaque compte est convertie dans la devise de base, au taux de la Banque du Canada du jour du relevé, ou à un taux fixé.
+
+Sans option, le script ne modifie rien : il écrit un rapport Markdown (soldes de la source et de l'app, écart, éléments sans correspondance, nombre de positions par compte). Avec `--apply debts` ou `--apply accounts`, il enregistre les soldes qui diffèrent comme des relevés datés (date de modification du classeur, date du relevé), par l'API de l'app, qui doit tourner : l'écart est reporté sur les relevés postérieurs, comme pour une saisie à la main. `--only NOM…` limite l'application à certaines lignes.
+
+Mise en route :
+
+```bash
+cd backend
+python reconcile.py   # crée reconcile_config.json à partir de reconcile_config.example.json
+# compléter reconcile_config.json, puis :
+python reconcile.py                                 # rapport : reconcile_report.md
+python reconcile.py --apply accounts                # enregistrer les écarts des comptes
+python reconcile.py --apply debts --only Visa Auto  # seulement ces dettes
+```
+
+| Clé de `reconcile_config.json` | Rôle | Par défaut |
+|---|---|---|
+| `api_url` | API de l'app, pour `--apply` | `http://127.0.0.1:8000` |
+| `spreadsheet.path` ou `spreadsheet.rclone_remote` | Le classeur, local ou distant (`gdrive:dettes.xlsx`) | aucun : pas de dettes |
+| `spreadsheet.sheet` | Feuille à lire (`--sheet` sur la ligne de commande) | l'année en cours |
+| `spreadsheet.name_column`, `balance_column`, `first_row` | Colonnes du nom et du solde, première ligne du bloc, qui s'arrête à la première ligne sans nom | `A`, `B`, `2` |
+| `holdings.directory`, `holdings.pattern` | Dossier des relevés et motif de leurs noms | aucun : pas de comptes ; `holdings-report-*.csv` |
+| `holdings.base_currency`, `holdings.fx_rates` | Devise de l'app et taux fixés (`{"USD": 1.37}`) ; sans taux fixé, la Banque du Canada (base CAD seulement) | `CAD`, `{}` |
+| `holdings.columns` | Noms des colonnes du relevé : compte, type, classification, symbole, valeur, devise | ceux de Wealthsimple |
+| `debts`, `debts_ignore` | Nom dans le classeur → nom de la dette dans l'app, quand ils diffèrent (sinon, même nom à la casse près) ; lignes à ignorer | |
+| `accounts`, `accounts_ignore` | Clé du compte (`compte\|type\|classification`, telle qu'affichée dans le rapport) → nom de l'actif dans l'app ; comptes à ignorer | |
+
+La configuration et le rapport contiennent des noms et des montants personnels : `.gitignore` les tient hors du dépôt.
+
 ## 📂 Structure du Projet
 
 - `/backend` : API Python, modèles de données et base de données SQLite.
