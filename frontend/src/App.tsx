@@ -8,9 +8,12 @@ import { Credits } from "./pages/Credits";
 import { RegisteredAccount } from "./pages/RegisteredAccount";
 import { Investissements } from "./pages/Investissements";
 
+// Prefix of the app's URLs: "/budget" once deployed on slashbin.net (see deploy_slashbin.sh), none locally
+const ROUTER_BASENAME = import.meta.env.VITE_ROUTER_BASENAME || undefined;
+
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={ROUTER_BASENAME}>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<ActifsPassifs />} />

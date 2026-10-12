@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# L'application est publiée sur https://slashbin.net/budget/ : le service budget.service écrit
+# déjà dans backend/finance.db. Une seconde instance sur la même base perdrait des saisies.
+if systemctl --user is-active --quiet budget.service 2>/dev/null; then
+    echo "budget.service tourne déjà sur cette base : utiliser https://slashbin.net/budget/." >&2
+    echo "Pour développer en local : systemctl --user stop budget.service, puis relancer ce script." >&2
+    exit 1
+fi
+
 # Nettoyage des anciens processus
 echo "Nettoyage des anciens processus..."
 python3 clean_ports.py
