@@ -81,9 +81,56 @@ interface Bank {
 
 interface HistoryItem {
   date: string;
-  assets: number;
+  assets: number | null;       // null before the first recorded asset value
   liabilities: number;
-  net_worth: number;
+  net_worth: number | null;
+}
+
+// A history item placed on a time axis: the charts space the points by the time between them,
+// so the yearly balances of the past years keep their place beside the frequent recent ones
+type HistoryPoint = HistoryItem & { time: number };
+
+const toPoints = (items: HistoryItem[]): HistoryPoint[] =>
+  items.map((h) => ({ ...h, time: new Date(`${h.date}T00:00:00`).getTime() }));
+
+// Beyond this many points, the dots of a line merge into a thick stroke
+const MAX_DOTS = 40;
+
+const fullDate = (time: unknown) =>
+  new Date(Number(time)).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+/** Time axis of a history chart: a tick per year over two years or more, a tick per month below. */
+function timeAxis(points: HistoryPoint[]) {
+  const ticks: number[] = [];
+  let yearly = false;
+  if (points.length > 0) {
+    const first = new Date(points[0].time);
+    const last = new Date(points[points.length - 1].time);
+    yearly = last.getFullYear() - first.getFullYear() >= 2;
+    const tick = yearly ? new Date(first.getFullYear() + 1, 0, 1) : new Date(first.getFullYear(), first.getMonth() + 1, 1);
+    while (tick <= last) {
+      ticks.push(tick.getTime());
+      if (yearly) tick.setFullYear(tick.getFullYear() + 1);
+      else tick.setMonth(tick.getMonth() + 1);
+    }
+    if (ticks.length === 0) ticks.push(points[0].time);
+  }
+  const label = (time: number) =>
+    yearly ? String(new Date(time).getFullYear()) : new Date(time).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  return (
+    <XAxis
+      dataKey="time"
+      type="number"
+      scale="time"
+      domain={["dataMin", "dataMax"]}
+      ticks={ticks}
+      tickFormatter={label}
+      axisLine={false}
+      tickLine={false}
+      tick={{fill: '#64748b', fontSize: 12}}
+      dy={10}
+    />
+  );
 }
 
 export function ActifsPassifs() {
@@ -306,6 +353,10 @@ export function ActifsPassifs() {
 
   if (!dashboard) return null;
 
+  const points = toPoints(history);
+  // The net worth needs the assets: it starts at their first recorded value
+  const netWorthPoints = points.filter((p) => p.net_worth !== null);
+
   return (
     <div className="p-4 md:p-6 font-sans text-slate-900">
       <header className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -367,38 +418,40 @@ export function ActifsPassifs() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
-              Évolution de la Valeur Nette
-            </h2>
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
+                Évolution de la Valeur Nette
+              </h2>
+              {netWorthPoints.length > 0 && netWorthPoints.length < points.length && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Depuis la première valeur d'actif enregistrée, le {fullDate(netWorthPoints[0].time)}
+                </p>
+              )}
+            </div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history}>
+              <LineChart data={netWorthPoints}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{fill: '#64748b', fontSize: 12}}
-                  dy={10}
-                />
-                <YAxis 
+                {timeAxis(netWorthPoints)}
+                <YAxis
                   axisLine={false}
                   tickLine={false}
                   tick={{fill: '#64748b', fontSize: 12}}
                   tickFormatter={(val) => `${val / 1000}k`}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  labelFormatter={fullDate}
                   formatter={(value) => [`${Number(value).toLocaleString()} $`, 'Valeur Nette']}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="net_worth" 
-                  stroke="#2563eb" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
+                <Line
+                  type="monotone"
+                  dataKey="net_worth"
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  dot={netWorthPoints.length > MAX_DOTS ? false : { r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }}
                   activeDot={{ r: 6, strokeWidth: 0 }}
                 />
               </LineChart>
@@ -415,30 +468,27 @@ export function ActifsPassifs() {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history}>
+              <LineChart data={points}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{fill: '#64748b', fontSize: 12}}
-                  dy={10}
-                />
-                <YAxis 
+                {timeAxis(points)}
+                <YAxis
                   axisLine={false}
                   tickLine={false}
                   tick={{fill: '#64748b', fontSize: 12}}
                   tickFormatter={(val) => `${val / 1000}k`}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                  labelFormatter={fullDate}
+                  formatter={(value) => [`${Number(value).toLocaleString()} $`, 'Passifs']}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="liabilities" 
-                  stroke="#f43f5e" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }}
+                <Line
+                  type="monotone"
+                  dataKey="liabilities"
+                  stroke="#f43f5e"
+                  strokeWidth={3}
+                  dot={points.length > MAX_DOTS ? false : { r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
                 />
               </LineChart>
             </ResponsiveContainer>

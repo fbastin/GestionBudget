@@ -470,6 +470,10 @@ def get_history(db: Session = Depends(database.get_db)):
             
     liability_balances = {l.id: 0.0 for l in all_liabilities}
     
+    # Assets are known from their first recorded value: before it, the debts alone would give a false net worth
+    asset_dates = [s.date for s in all_snapshots if s.asset_id]
+    assets_known_from = min(asset_dates) if asset_dates else None
+
     # Group snapshots by date
     snapshots_by_date = {}
     for s in all_snapshots:
@@ -489,12 +493,13 @@ def get_history(db: Session = Depends(database.get_db)):
                 
         total_assets = sum(asset_balances.values())
         total_liabilities = sum(liability_balances.values())
+        known = assets_known_from is None or d >= assets_known_from
         
         history.append({
             'date': d,
-            'assets': models.to_cents(total_assets),
+            'assets': models.to_cents(total_assets) if known else None,
             'liabilities': models.to_cents(total_liabilities),
-            'net_worth': models.to_cents(total_assets - total_liabilities)
+            'net_worth': models.to_cents(total_assets - total_liabilities) if known else None
         })
         
     return history

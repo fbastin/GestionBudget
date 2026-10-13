@@ -102,7 +102,7 @@ La configuration et le rapport contiennent des noms et des montants personnels :
 
 ## 📈 Fonctionnalités Actuelles (MVP)
 
-- **Tableau de bord** : Vue d'ensemble des Actifs, Passifs et Valeur Nette.
+- **Tableau de bord** : Vue d'ensemble des Actifs, Passifs et Valeur Nette. Les graphes d'évolution placent les relevés sur une échelle de temps : des soldes annuels anciens et des relevés récents rapprochés y gardent leur juste place. La valeur nette commence à la première valeur d'actif enregistrée ; avant elle, les dettes seules en donneraient une fausse.
 - **Suivi des Dettes** : Liste détaillée et graphique d'évolution historique.
 - **Gestion du Patrimoine** : Centralisation des biens immobiliers et comptes bancaires.
 - **Investissements** : Répertoire des stocks et dividendes canadiens.

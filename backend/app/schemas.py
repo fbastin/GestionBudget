@@ -118,9 +118,9 @@ class DashboardData(BaseModel):
 
 class HistoryItem(BaseModel):
     date: dt_date
-    assets: float
+    assets: Optional[float]           # None before the first recorded asset value
     liabilities: float
-    net_worth: float
+    net_worth: Optional[float]
 
 class BankBase(BaseModel):
     name: str
