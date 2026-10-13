@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getBanks, createBank, deleteBank, updateBank, getAssets, errorMessage } from "../api";
 import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2, TriangleAlert } from "lucide-react";
 import { money } from "../format";
+import { accountLabel } from "../accounts";
 
 interface Snapshot {
   date: string;
@@ -284,7 +285,7 @@ export function Banques() {
                       const amount = a.snapshots?.[a.snapshots.length - 1]?.amount || 0;
                       return (
                         <div key={a.id} className="flex items-center justify-between text-xs">
-                          <span className="text-slate-600">{a.name}</span>
+                          <span className="text-slate-600">{accountLabel(a, assets)}</span>
                           {amount < 0 ? (
                             <span className="font-semibold text-rose-600 flex items-center gap-1" title="Solde négatif : il manque sans doute une entrée d'argent, ou le solde réel est à saisir.">
                               <TriangleAlert size={12} className="text-amber-500" />{money(amount)}

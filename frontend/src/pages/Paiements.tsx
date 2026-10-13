@@ -26,6 +26,7 @@ import {
   TrendingDown
 } from "lucide-react";
 import { money } from "../format";
+import { accountLabel, accountLabelById } from "../accounts";
 
 export function Paiements() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -305,7 +306,7 @@ export function Paiements() {
                       return (
                         <optgroup key={`bank-group-${b.id}`} label={b.name}>
                           {bankAssets.map(a => (
-                            <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                            <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
                           ))}
                         </optgroup>
                       );
@@ -377,7 +378,7 @@ export function Paiements() {
                     payments.map((payment) => {
                       let bankName = "";
                       if (payment.asset_id) {
-                        bankName = assets.find(a => a.id === payment.asset_id)?.name || "";
+                        bankName = accountLabelById(payment.asset_id, assets);
                       } else if (payment.bank_id) {
                         bankName = banks.find(b => b.id === payment.bank_id)?.name || "";
                       }

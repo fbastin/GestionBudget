@@ -36,6 +36,7 @@ import {
   TrendingDown
 } from "lucide-react";
 import { money } from "../format";
+import { accountLabel, accountLabelById } from "../accounts";
 
 // Expenses and payments shown in a single list
 type Transaction = (Expense & { type: "expense" }) | (Payment & { type: "payment" });
@@ -447,7 +448,7 @@ export function Depenses() {
                           return (
                             <optgroup key={`bank-group-${b.id}`} label={b.name}>
                               {bankAssets.map(a => (
-                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
                               ))}
                             </optgroup>
                           );
@@ -500,7 +501,7 @@ export function Depenses() {
                           return (
                             <optgroup key={`bank-inner-${b.id}`} label={`  ${b.name}`}>
                               {bankAssets.map(a => (
-                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+                                <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
                               ))}
                             </optgroup>
                           );
@@ -563,7 +564,7 @@ export function Depenses() {
                       if (item.type === 'payment') {
                         let bankName = "";
                         if (item.asset_id) {
-                          bankName = assets.find(a => a.id === item.asset_id)?.name || "";
+                          bankName = accountLabelById(item.asset_id, assets);
                         } else if (item.bank_id) {
                           bankName = banks.find(b => b.id === item.bank_id)?.name || "";
                         }
@@ -574,7 +575,7 @@ export function Depenses() {
                         account = `${bankName || 'Cash'} → ${creditName}`;
                       } else {
                         if (item.asset_id) {
-                          account = assets.find(a => a.id === item.asset_id)?.name || "";
+                          account = accountLabelById(item.asset_id, assets);
                         } else if (item.bank_id) {
                           account = banks.find(b => b.id === item.bank_id)?.name || "";
                         } else if (item.credit_id) {

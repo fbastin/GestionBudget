@@ -45,6 +45,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 import { money } from "../format";
+import { accountLabel } from "../accounts";
 
 interface DashboardData {
   total_assets: number;
@@ -404,7 +405,7 @@ export function ActifsPassifs() {
         <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-800 text-sm">
           <TriangleAlert size={20} className="shrink-0 mt-0.5" />
           <p>
-            Solde négatif : {negativeAssets.map((a) => `${a.name} (${money(assetAmount(a))})`).join(", ")}.
+            Solde négatif : {negativeAssets.map((a) => `${accountLabel(a, assets)} (${money(assetAmount(a))})`).join(", ")}.
             Il manque sans doute une entrée d'argent (page <Link to="/entrees" className="underline font-semibold">Entrées</Link>),
             ou le solde réel est à saisir.
           </p>

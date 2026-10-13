@@ -4,6 +4,7 @@ import { todayLocal } from "../date";
 import type { Asset, Bank, Deposit } from "../types";
 import { BanknoteArrowDown, Plus, Trash2, Calendar, Tag, Wallet, Loader2, AlertCircle, Pencil, X, ArrowRightLeft } from "lucide-react";
 import { money } from "../format";
+import { accountLabel, accountLabelById } from "../accounts";
 
 // Today's date when the form is emptied, not when the page was loaded
 const emptyForm = () => ({ date: todayLocal(), description: "", amount: "", account: "", source: "" });
@@ -38,7 +39,7 @@ function AccountOptions({ banks, assets }: { banks: Bank[]; assets: Asset[] }) {
         return (
           <optgroup key={`bank-group-${b.id}`} label={b.name}>
             {bankAssets.map((a) => (
-              <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{a.name}</option>
+              <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
             ))}
           </optgroup>
         );
@@ -132,7 +133,7 @@ export function Entrees() {
   };
 
   const accountName = (bankId: number | null, assetId: number | null) =>
-    assetId ? assets.find((a) => a.id === assetId)?.name : bankId ? banks.find((b) => b.id === bankId)?.name : undefined;
+    assetId ? accountLabelById(assetId, assets) : bankId ? banks.find((b) => b.id === bankId)?.name : undefined;
 
   if (loading) {
     return (

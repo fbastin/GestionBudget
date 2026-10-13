@@ -3,6 +3,7 @@ import { getAssets, getInvestments, createInvestment, updateInvestment, deleteIn
 import type { AssetDetails } from "../types";
 import { TrendingUp, Plus, Trash2, Save, X, Building2, BarChart3, Wallet, Edit2 } from "lucide-react";
 import { money, decimal, percent } from "../format";
+import { accountLabel } from "../accounts";
 
 interface Investment {
   id: number;
@@ -317,7 +318,7 @@ export function Investissements() {
                             <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-400 uppercase">Compte</label>
                               <select className="w-full rounded-lg border-slate-200 text-sm" value={editAssetId} onChange={e => setEditAssetId(e.target.value)}>
-                                {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                {assets.map(a => <option key={a.id} value={a.id}>{accountLabel(a, assets)}</option>)}
                               </select>
                             </div>
                             <div className="flex gap-2">
@@ -334,7 +335,7 @@ export function Investissements() {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5 text-slate-600 text-sm">
                             <Building2 size={14} className="text-slate-400" />
-                            {asset?.name || "Inconnu"}
+                            {asset ? accountLabel(asset, assets) : "Inconnu"}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-sm text-slate-600">{decimal(i.quantity, 0, 4)}</td>
