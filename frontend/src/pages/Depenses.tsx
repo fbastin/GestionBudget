@@ -35,6 +35,7 @@ import {
   CreditCard,
   TrendingDown
 } from "lucide-react";
+import { money } from "../format";
 
 // Expenses and payments shown in a single list
 type Transaction = (Expense & { type: "expense" }) | (Payment & { type: "payment" });
@@ -596,7 +597,7 @@ export function Depenses() {
                                   <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Remboursement</span>
                                   {item.interest > 0 && (
                                     <span className="text-[10px] font-bold text-orange-500 uppercase tracking-tight">
-                                      dont {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(item.interest)} d'intérêt
+                                      dont {money(item.interest)} d'intérêt
                                     </span>
                                   )}
                                 </div>
@@ -614,7 +615,7 @@ export function Depenses() {
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <span className={`font-bold ${item.type === 'payment' ? 'text-blue-600' : 'text-slate-900'}`}>
-                              {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(item.amount)}
+                              {money(item.amount)}
                             </span>
                           </td>
                           <td className="px-4 py-2.5 text-right">

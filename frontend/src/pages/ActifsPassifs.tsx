@@ -43,6 +43,7 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from "recharts";
+import { money } from "../format";
 
 interface DashboardData {
   total_assets: number;
@@ -395,7 +396,7 @@ export function ActifsPassifs() {
             <Landmark size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Actifs Totaux</span>
           </div>
-          <div className="text-3xl font-extrabold">{dashboard.total_assets.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(dashboard.total_assets)}</div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
@@ -403,7 +404,7 @@ export function ActifsPassifs() {
             <TrendingDown size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Passifs Totaux</span>
           </div>
-          <div className="text-3xl font-extrabold">{dashboard.total_liabilities.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(dashboard.total_liabilities)}</div>
         </div>
 
         <div className="bg-blue-600 p-5 rounded-2xl shadow-lg border border-blue-500 text-white transform hover:scale-[1.02] transition-transform">
@@ -411,7 +412,7 @@ export function ActifsPassifs() {
             <Wallet size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Nette</span>
           </div>
-          <div className="text-3xl font-extrabold">{dashboard.net_worth.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(dashboard.net_worth)}</div>
         </div>
       </div>
 
@@ -444,7 +445,7 @@ export function ActifsPassifs() {
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                   labelFormatter={fullDate}
-                  formatter={(value) => [`${Number(value).toLocaleString()} $`, 'Valeur Nette']}
+                  formatter={(value) => [money(Number(value)), 'Valeur Nette']}
                 />
                 <Line
                   type="monotone"
@@ -480,7 +481,7 @@ export function ActifsPassifs() {
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
                   labelFormatter={fullDate}
-                  formatter={(value) => [`${Number(value).toLocaleString()} $`, 'Passifs']}
+                  formatter={(value) => [money(Number(value)), 'Passifs']}
                 />
                 <Line
                   type="monotone"
@@ -659,7 +660,7 @@ export function ActifsPassifs() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-rose-600 text-lg">
-                      {currentAmount.toLocaleString()} $
+                      {money(currentAmount)}
                     </span>
                   </div>
                 </div>
@@ -894,7 +895,7 @@ export function ActifsPassifs() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-emerald-600 text-lg">
-                      {currentAmount.toLocaleString()} $
+                      {money(currentAmount)}
                     </span>
                   </div>
                 </div>
@@ -926,7 +927,7 @@ export function ActifsPassifs() {
                   <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
                     <div className="flex items-center gap-4">
                       <span className="font-mono text-slate-500">{s.date}</span>
-                      <span className="font-bold text-slate-900">{s.amount.toLocaleString()} $</span>
+                      <span className="font-bold text-slate-900">{money(s.amount)}</span>
                     </div>
                     <button 
                       onClick={() => handleDeleteSnapshot(s.id)}

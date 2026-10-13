@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getBanks, createBank, deleteBank, updateBank, getAssets, errorMessage } from "../api";
 import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2 } from "lucide-react";
+import { money } from "../format";
 
 interface Snapshot {
   date: string;
@@ -147,7 +148,7 @@ export function Banques() {
             <Landmark size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Solde Total Bancaire</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalBalance.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalBalance)}</div>
         </div>
       </div>
 
@@ -273,7 +274,7 @@ export function Banques() {
                   <div className="text-sm font-medium text-slate-500 flex items-center gap-1">
                     <Wallet size={14} /> Solde Bancaire
                   </div>
-                  <span className="font-bold text-slate-700">{bank.balance.toLocaleString()} $</span>
+                  <span className="font-bold text-slate-700">{money(bank.balance)}</span>
                 </div>
 
                 {bankAssets.length > 0 && (
@@ -282,12 +283,12 @@ export function Banques() {
                     {bankAssets.map(a => (
                       <div key={a.id} className="flex items-center justify-between text-xs">
                         <span className="text-slate-600">{a.name}</span>
-                        <span className="font-semibold text-slate-800">{(a.snapshots?.[a.snapshots.length - 1]?.amount || 0).toLocaleString()} $</span>
+                        <span className="font-semibold text-slate-800">{money(a.snapshots?.[a.snapshots.length - 1]?.amount || 0)}</span>
                       </div>
                     ))}
                     <div className="pt-1 flex items-center justify-between text-xs border-t border-slate-50">
                       <span className="text-slate-400 italic">Sous-total actifs</span>
-                      <span className="font-bold text-emerald-600">{assetsTotal.toLocaleString()} $</span>
+                      <span className="font-bold text-emerald-600">{money(assetsTotal)}</span>
                     </div>
                   </div>
                 )}
@@ -295,7 +296,7 @@ export function Banques() {
                 <div className="pt-4 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900">Total Institution</span>
-                    <span className="text-xl font-black text-indigo-600">{institutionTotal.toLocaleString()} $</span>
+                    <span className="text-xl font-black text-indigo-600">{money(institutionTotal)}</span>
                   </div>
                 </div>
               </div>

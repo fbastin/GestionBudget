@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getCredits, createCredit, deleteCredit, updateCredit, getLiabilities, addSnapshot, deleteSnapshot, errorMessage } from "../api";
 import { todayLocal } from "../date";
 import { CreditCard, Plus, Trash2, Save, X, Link as LinkIcon, Info, Edit2, History as HistoryIcon } from "lucide-react";
+import { money, percent } from "../format";
 
 interface Snapshot {
   id: number;
@@ -212,14 +213,14 @@ export function Credits() {
             <CreditCard size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Dette de Crédit Totale</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalBalance.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalBalance)}</div>
         </div>
         <div className="bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-700 text-white">
           <div className="flex items-center gap-2 text-slate-400 mb-2">
             <Info size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Capacité de Crédit Totale</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalLimit.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalLimit)}</div>
         </div>
       </div>
 
@@ -454,14 +455,14 @@ export function Credits() {
                   <div>
                     <div className="text-xs text-slate-400 font-bold uppercase">Solde actuel</div>
                     <div className="text-2xl font-black text-slate-900">
-                      {currentLiabilityAmount.toLocaleString()} $
+                      {money(currentLiabilityAmount)}
                     </div>
                   </div>
                   {credit.limit && (
                     <div className="text-right">
                       <div className="text-xs text-slate-400 font-bold uppercase">Limite</div>
                       <div className="text-lg font-bold text-slate-600">
-                        {credit.limit.toLocaleString()} $
+                        {money(credit.limit)}
                       </div>
                     </div>
                   )}
@@ -472,7 +473,7 @@ export function Credits() {
                     <div className="flex justify-between text-xs font-bold mb-1">
                       <span className="text-slate-400">Utilisation</span>
                       <span className={utilization > 80 ? "text-rose-600" : "text-slate-600"}>
-                        {utilization.toFixed(1)}%
+                        {percent(utilization, 1)}
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2">
@@ -535,7 +536,7 @@ export function Credits() {
                   <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
                     <div className="flex items-center gap-4">
                       <span className="font-mono text-slate-500">{s.date}</span>
-                      <span className="font-bold text-slate-900">{s.amount.toLocaleString()} $</span>
+                      <span className="font-bold text-slate-900">{money(s.amount)}</span>
                     </div>
                     <button 
                       onClick={() => handleDeleteSnapshot(s.id)}

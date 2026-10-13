@@ -25,6 +25,7 @@ import {
   CreditCard,
   TrendingDown
 } from "lucide-react";
+import { money } from "../format";
 
 export function Paiements() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -393,7 +394,7 @@ export function Paiements() {
                               <span className="font-semibold text-slate-900">{payment.description}</span>
                               {payment.interest > 0 && (
                                 <span className="text-[10px] font-bold text-orange-500 uppercase tracking-tight">
-                                  dont {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(payment.interest)} d'intérêt
+                                  dont {money(payment.interest)} d'intérêt
                                 </span>
                               )}
                             </div>
@@ -415,7 +416,7 @@ export function Paiements() {
                           </td>
                           <td className="px-4 py-2.5 text-right">
                             <span className="font-bold text-blue-600">
-                              {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(payment.amount)}
+                              {money(payment.amount)}
                             </span>
                           </td>
                           <td className="px-4 py-2.5 text-right">

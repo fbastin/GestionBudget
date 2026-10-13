@@ -24,6 +24,7 @@ import {
   Edit2, 
   History as HistoryIcon 
 } from "lucide-react";
+import { money } from "../format";
 
 interface Snapshot {
   id: number;
@@ -267,21 +268,21 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Actuelle</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalValue.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalValue)}</div>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-slate-500 mb-2">
             <PieChart size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Total Contributions</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalContributions.toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalContributions)}</div>
         </div>
         <div className={`${theme.bg} p-5 rounded-2xl shadow-lg border ${theme.border500} text-white`}>
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Gain/Perte Latent</span>
           </div>
-          <div className="text-3xl font-extrabold">{(totalValue - totalContributions).toLocaleString()} $</div>
+          <div className="text-3xl font-extrabold">{money(totalValue - totalContributions)}</div>
         </div>
       </div>
 
@@ -420,7 +421,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
 
                   <div className="flex items-center gap-3">
                     <div className={`font-bold ${theme.text} text-lg`}>
-                      {currentAmount.toLocaleString()} $
+                      {money(currentAmount)}
                     </div>
                   </div>
                 </div>
@@ -523,7 +524,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="font-bold text-slate-900">{c.amount.toLocaleString()} $</div>
+                      <div className="font-bold text-slate-900">{money(c.amount)}</div>
                       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => {
@@ -568,7 +569,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                   <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
                     <div className="flex items-center gap-4">
                       <span className="font-mono text-slate-500">{s.date}</span>
-                      <span className="font-bold text-slate-900">{s.amount.toLocaleString()} $</span>
+                      <span className="font-bold text-slate-900">{money(s.amount)}</span>
                     </div>
                     <button 
                       onClick={() => handleDeleteSnapshot(s.id)}

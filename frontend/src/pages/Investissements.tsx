@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAssets, getInvestments, createInvestment, updateInvestment, deleteInvestment } from "../api";
 import type { AssetDetails } from "../types";
 import { TrendingUp, Plus, Trash2, Save, X, Building2, BarChart3, Wallet, Edit2 } from "lucide-react";
+import { money, decimal, percent } from "../format";
 
 interface Investment {
   id: number;
@@ -167,23 +168,23 @@ export function Investissements() {
             <Wallet size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Total Investi</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalInvested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
+          <div className="text-3xl font-extrabold">{money(totalInvested)}</div>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-blue-600 mb-2">
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Marché</span>
           </div>
-          <div className="text-3xl font-extrabold">{totalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
+          <div className="text-3xl font-extrabold">{money(totalMarketValue)}</div>
         </div>
         <div className={`p-5 rounded-2xl shadow-lg border text-white ${totalMarketValue >= totalInvested ? 'bg-emerald-600 border-emerald-500' : 'bg-rose-600 border-rose-500'}`}>
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <BarChart3 size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Gain/Perte Total</span>
           </div>
-          <div className="text-3xl font-extrabold">{(totalMarketValue - totalInvested).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
+          <div className="text-3xl font-extrabold">{money(totalMarketValue - totalInvested)}</div>
           <div className="text-sm opacity-80 font-bold">
-            {totalInvested > 0 ? ((totalMarketValue / totalInvested - 1) * 100).toFixed(2) : 0}%
+            {percent(totalInvested > 0 ? (totalMarketValue / totalInvested - 1) * 100 : 0)}
           </div>
         </div>
       </div>
@@ -336,20 +337,20 @@ export function Investissements() {
                             {asset?.name || "Inconnu"}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600">{i.quantity.toLocaleString()}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600">{i.average_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })} $</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600">{decimal(i.quantity, 0, 4)}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600">{money(i.average_cost, "CAD", 4)}</td>
                         <td className="px-4 py-2.5 text-sm text-slate-600">
-                          {i.current_price ? `${i.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })} $` : "—"}
+                          {i.current_price ? money(i.current_price, "CAD", 4) : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <div className="font-bold text-slate-900">{marketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
+                          <div className="font-bold text-slate-900">{money(marketValue)}</div>
                         </td>
                         <td className="px-4 py-2.5 text-right">
                           <div className={`font-bold ${gainLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {gainLoss >= 0 ? '+' : ''}{gainLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $
+                            {gainLoss >= 0 ? '+' : ''}{money(gainLoss)}
                           </div>
                           <div className={`text-xs font-bold ${gainLoss >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {gainLoss >= 0 ? '+' : ''}{gainLossPct.toFixed(2)}%
+                            {gainLoss >= 0 ? '+' : ''}{percent(gainLossPct)}
                           </div>
                         </td>
                         <td className="px-4 py-2.5 text-right">
