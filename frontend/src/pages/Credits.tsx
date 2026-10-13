@@ -181,8 +181,8 @@ export function Credits() {
   }
 
   return (
-    <div className="p-4 md:p-8 font-sans text-slate-900">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 font-sans text-slate-900">
+      <header className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-rose-600 p-2 rounded-lg text-white shadow-lg">
             <CreditCard size={24} />
@@ -206,15 +206,15 @@ export function Credits() {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-rose-600 mb-2">
             <CreditCard size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Dette de Crédit Totale</span>
           </div>
           <div className="text-3xl font-extrabold">{totalBalance.toLocaleString()} $</div>
         </div>
-        <div className="bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-700 text-white">
+        <div className="bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-700 text-white">
           <div className="flex items-center gap-2 text-slate-400 mb-2">
             <Info size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Capacité de Crédit Totale</span>
@@ -224,7 +224,7 @@ export function Credits() {
       </div>
 
       {isAdding && (
-        <div className="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-2xl">
+        <div className="mb-5 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-2xl">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-slate-700">Nouveau Crédit / Prêt</h3>
             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600">
@@ -313,7 +313,7 @@ export function Credits() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {credits.map((credit) => {
           const snapshots = credit.liability?.snapshots || [];
           const filteredSnapshots = snapshots.filter(s => s.date <= todayStr);
@@ -324,7 +324,7 @@ export function Credits() {
 
           if (isEditing) {
             return (
-              <div key={credit.id} className="bg-white p-6 rounded-2xl shadow-md border-2 border-rose-200 space-y-4">
+              <div key={credit.id} className="bg-white p-5 rounded-2xl shadow-md border-2 border-rose-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-slate-700">Modifier le crédit</h3>
                   <div className="flex gap-2">
@@ -419,7 +419,7 @@ export function Credits() {
           }
 
           return (
-            <div key={credit.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
+            <div key={credit.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="font-bold text-lg text-slate-800">{credit.name}</div>
@@ -449,7 +449,7 @@ export function Credits() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-xs text-slate-400 font-bold uppercase">Solde actuel</div>
@@ -504,7 +504,7 @@ export function Credits() {
       </div>
 
       {credits.length === 0 && !isAdding && (
-        <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+        <div className="text-center py-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
           <CreditCard size={48} className="mx-auto text-slate-300 mb-4" />
           <p className="text-slate-500 font-medium">Aucun crédit enregistré</p>
           <button
@@ -520,7 +520,7 @@ export function Credits() {
       {showHistoryFor && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <HistoryIcon className="text-blue-600" size={24} />
                 <h3 className="font-bold text-xl">Historique du crédit</h3>
@@ -529,7 +529,7 @@ export function Credits() {
                 <X size={24} />
               </button>
             </div>
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
               <div className="space-y-3">
                 {liabilities.find(l => l.id === showHistoryFor)?.snapshots?.slice().reverse().map(s => (
                   <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
@@ -547,7 +547,7 @@ export function Credits() {
                 ))}
               </div>
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
+            <div className="p-5 bg-slate-50 border-t border-slate-100">
               <button 
                 onClick={() => setShowHistoryFor(null)}
                 className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"

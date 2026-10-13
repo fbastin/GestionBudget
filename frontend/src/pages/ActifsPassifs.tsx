@@ -307,8 +307,8 @@ export function ActifsPassifs() {
   if (!dashboard) return null;
 
   return (
-    <div className="p-4 md:p-8 font-sans text-slate-900">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 font-sans text-slate-900">
+      <header className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 p-2 rounded-lg text-white shadow-lg">
             <LayoutDashboard size={24} />
@@ -338,8 +338,8 @@ export function ActifsPassifs() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2 text-emerald-600 mb-2">
             <Landmark size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Actifs Totaux</span>
@@ -347,7 +347,7 @@ export function ActifsPassifs() {
           <div className="text-3xl font-extrabold">{dashboard.total_assets.toLocaleString()} $</div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2 text-rose-600 mb-2">
             <TrendingDown size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Passifs Totaux</span>
@@ -355,7 +355,7 @@ export function ActifsPassifs() {
           <div className="text-3xl font-extrabold">{dashboard.total_liabilities.toLocaleString()} $</div>
         </div>
 
-        <div className="bg-blue-600 p-6 rounded-2xl shadow-lg border border-blue-500 text-white transform hover:scale-[1.02] transition-transform">
+        <div className="bg-blue-600 p-5 rounded-2xl shadow-lg border border-blue-500 text-white transform hover:scale-[1.02] transition-transform">
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <Wallet size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Nette</span>
@@ -364,9 +364,9 @@ export function ActifsPassifs() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
               Évolution de la Valeur Nette
@@ -406,8 +406,8 @@ export function ActifsPassifs() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <span className="w-2 h-6 bg-rose-500 rounded-full"></span>
               Évolution des Passifs
@@ -446,9 +446,9 @@ export function ActifsPassifs() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <TrendingDown className="text-rose-500" size={24} />
               Liste des Dettes
@@ -462,7 +462,7 @@ export function ActifsPassifs() {
           </div>
 
           {isAddingLiability && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+            <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-700">Nouvelle Dette</h3>
                 <button onClick={() => setIsAddingLiability(false)} className="text-slate-400 hover:text-slate-600">
@@ -618,9 +618,9 @@ export function ActifsPassifs() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <Landmark className="text-emerald-500" size={24} />
               Mes Actifs
             </h2>
@@ -633,7 +633,7 @@ export function ActifsPassifs() {
           </div>
 
           {isAddingAsset && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+            <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-700">Nouvel Actif</h3>
                 <button onClick={() => setIsAddingAsset(false)} className="text-slate-400 hover:text-slate-600">
@@ -858,7 +858,7 @@ export function ActifsPassifs() {
       {showHistoryFor && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <HistoryIcon className="text-blue-600" size={24} />
                 <h3 className="font-bold text-xl">Historique des relevés</h3>
@@ -867,7 +867,7 @@ export function ActifsPassifs() {
                 <X size={24} />
               </button>
             </div>
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
               <div className="space-y-3">
                 {(showHistoryFor.type === 'asset' 
                   ? assets.find(a => a.id === showHistoryFor.id)?.snapshots 
@@ -888,7 +888,7 @@ export function ActifsPassifs() {
                 ))}
               </div>
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
+            <div className="p-5 bg-slate-50 border-t border-slate-100">
               <button 
                 onClick={() => setShowHistoryFor(null)}
                 className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"

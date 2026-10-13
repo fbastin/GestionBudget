@@ -304,8 +304,8 @@ export function Depenses() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-6">
+      <div className="flex justify-between items-center mb-5">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Dépenses</h1>
           <p className="text-slate-500 mt-1">Suivez vos dépenses et remboursements de dettes</p>
@@ -327,17 +327,17 @@ export function Depenses() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
+        <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
           <AlertCircle size={20} />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Formulaire d'ajout/modification */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 sticky top-8">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 sticky top-8">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {editingId ? <Pencil className="text-orange-500" size={20} /> : <Plus className="text-blue-600" size={20} />}
                 {editingId ? (isEditingPayment ? "Modifier Remboursement" : "Modifier Dépense") : "Nouvelle Transaction"}
@@ -348,7 +348,7 @@ export function Depenses() {
                 </button>
               )}
             </h2>
-            <form onSubmit={handleAddExpense} className="space-y-4">
+            <form onSubmit={handleAddExpense} className="space-y-3">
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <input
                   type="checkbox"
@@ -534,24 +534,24 @@ export function Depenses() {
         {/* Liste des dépenses */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-50">
+            <div className="p-5 border-b border-slate-50">
               <h2 className="text-lg font-bold text-slate-900">Historique des transactions</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Description</th>
-                    <th className="px-6 py-4">Compte</th>
-                    <th className="px-6 py-4 text-right">Montant</th>
-                    <th className="px-6 py-4"></th>
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Description</th>
+                    <th className="px-4 py-2.5">Compte</th>
+                    <th className="px-4 py-2.5 text-right">Montant</th>
+                    <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {expenses.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">
                         Aucune transaction enregistrée
                       </td>
                     </tr>
@@ -586,8 +586,8 @@ export function Depenses() {
                       
                       return (
                         <tr key={`${item.type}-${item.id}`} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-4 text-slate-600 text-sm">{item.date}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5 text-slate-600 text-sm">{item.date}</td>
+                          <td className="px-4 py-2.5">
                             <div className="flex flex-col">
                               <span className="font-semibold text-slate-900">{item.description}</span>
                               {item.type === 'payment' && (
@@ -602,7 +602,7 @@ export function Depenses() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5">
                             {account !== 'N/A' ? (
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.type === 'payment' ? 'bg-blue-100 text-blue-700' : (item.bank_id ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700')}`}>
                                 {account}
@@ -611,12 +611,12 @@ export function Depenses() {
                               <span className="text-slate-400 text-xs italic">N/A</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-4 py-2.5 text-right">
                             <span className={`font-bold ${item.type === 'payment' ? 'text-blue-600' : 'text-slate-900'}`}>
                               {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(item.amount)}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-4 py-2.5 text-right">
                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button
                                 onClick={() => handleEdit(item)}

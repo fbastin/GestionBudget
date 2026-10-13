@@ -144,8 +144,8 @@ export function Investissements() {
   }
 
   return (
-    <div className="p-4 md:p-8 font-sans text-slate-900">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 font-sans text-slate-900">
+      <header className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 p-2 rounded-lg text-white shadow-lg">
             <BarChart3 size={24} />
@@ -161,22 +161,22 @@ export function Investissements() {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-slate-500 mb-2">
             <Wallet size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Total Investi</span>
           </div>
           <div className="text-3xl font-extrabold">{totalInvested.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-blue-600 mb-2">
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Marché</span>
           </div>
           <div className="text-3xl font-extrabold">{totalMarketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
         </div>
-        <div className={`p-6 rounded-2xl shadow-lg border text-white ${totalMarketValue >= totalInvested ? 'bg-emerald-600 border-emerald-500' : 'bg-rose-600 border-rose-500'}`}>
+        <div className={`p-5 rounded-2xl shadow-lg border text-white ${totalMarketValue >= totalInvested ? 'bg-emerald-600 border-emerald-500' : 'bg-rose-600 border-rose-500'}`}>
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <BarChart3 size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Gain/Perte Total</span>
@@ -189,7 +189,7 @@ export function Investissements() {
       </div>
 
       {isAdding && (
-        <div className="mb-8 p-6 bg-white rounded-2xl border-2 border-blue-100 shadow-xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="mb-5 p-5 bg-white rounded-2xl border-2 border-blue-100 shadow-xl space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-800">Nouvel Investissement</h3>
             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -273,14 +273,14 @@ export function Investissements() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Ticker</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Compte</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Quantité</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Prix Moyen</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Prix Marché</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Valeur</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gain/Perte</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20"></th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Ticker</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Compte</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Quantité</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Prix Moyen</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Prix Marché</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Valeur</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gain/Perte</th>
+                <th className="px-4 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wider w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -327,24 +327,24 @@ export function Investissements() {
                       </td>
                     ) : (
                       <>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-2.5">
                           <div className="font-bold text-slate-900">{i.symbol}</div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5 text-slate-600 text-sm">
                             <Building2 size={14} className="text-slate-400" />
                             {asset?.name || "Inconnu"}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{i.quantity.toLocaleString()}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{i.average_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })} $</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">
+                        <td className="px-4 py-2.5 text-sm text-slate-600">{i.quantity.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600">{i.average_cost.toLocaleString(undefined, { minimumFractionDigits: 2 })} $</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600">
                           {i.current_price ? `${i.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })} $` : "—"}
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-2.5 text-right">
                           <div className="font-bold text-slate-900">{marketValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-2.5 text-right">
                           <div className={`font-bold ${gainLoss >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {gainLoss >= 0 ? '+' : ''}{gainLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $
                           </div>
@@ -352,7 +352,7 @@ export function Investissements() {
                             {gainLoss >= 0 ? '+' : ''}{gainLossPct.toFixed(2)}%
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
+                        <td className="px-4 py-2.5 text-right">
                           <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity gap-1">
                             <button 
                               onClick={() => {
@@ -382,7 +382,7 @@ export function Investissements() {
               })}
               {investments.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400 italic">
+                  <td colSpan={8} className="px-4 py-8 text-center text-slate-400 italic">
                     Aucun investissement enregistré. Cliquez sur "Ajouter un Titre" pour commencer.
                   </td>
                 </tr>

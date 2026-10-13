@@ -244,8 +244,8 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
   }
 
   return (
-    <div className="p-4 md:p-8 font-sans text-slate-900">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 font-sans text-slate-900">
+      <header className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className={`${theme.bg} p-2 rounded-lg text-white shadow-lg`}>
             <Landmark size={24} />
@@ -261,22 +261,22 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className={`flex items-center gap-2 ${theme.text} mb-2`}>
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Valeur Actuelle</span>
           </div>
           <div className="text-3xl font-extrabold">{totalValue.toLocaleString()} $</div>
         </div>
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-slate-500 mb-2">
             <PieChart size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Total Contributions</span>
           </div>
           <div className="text-3xl font-extrabold">{totalContributions.toLocaleString()} $</div>
         </div>
-        <div className={`${theme.bg} p-6 rounded-2xl shadow-lg border ${theme.border500} text-white`}>
+        <div className={`${theme.bg} p-5 rounded-2xl shadow-lg border ${theme.border500} text-white`}>
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <TrendingUp size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Gain/Perte Latent</span>
@@ -285,10 +285,10 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Assets List */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Landmark className={`${theme.text500}`} size={24} />
             Comptes et Placements {type}
           </h2>
@@ -432,14 +432,14 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
         </div>
 
         {/* Contributions List */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <HistoryIcon className="text-slate-500" size={24} />
             Historique des Contributions
           </h2>
 
           {isAdding && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+            <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-slate-700">Nouvelle entrée</h3>
                 <button onClick={() => setIsAdding(false)} className="text-slate-400">
@@ -553,7 +553,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
       {showHistoryFor && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
                 <HistoryIcon className="text-blue-600" size={24} />
                 <h3 className="font-bold text-xl">Historique des relevés</h3>
@@ -562,7 +562,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                 <X size={24} />
               </button>
             </div>
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
+            <div className="p-5 max-h-[60vh] overflow-y-auto">
               <div className="space-y-3">
                 {assets.find(a => a.id === showHistoryFor)?.snapshots?.slice().reverse().map(s => (
                   <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 group">
@@ -580,7 +580,7 @@ export function RegisteredAccount({ type }: { type: "CELI" | "REER" }) {
                 ))}
               </div>
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-100">
+            <div className="p-5 bg-slate-50 border-t border-slate-100">
               <button 
                 onClick={() => setShowHistoryFor(null)}
                 className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors"

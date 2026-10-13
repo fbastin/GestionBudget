@@ -120,8 +120,8 @@ export function Banques() {
   }
 
   return (
-    <div className="p-4 md:p-8 font-sans text-slate-900">
-      <header className="mb-8 flex items-center justify-between">
+    <div className="p-4 md:p-6 font-sans text-slate-900">
+      <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-lg">
             <Building2 size={24} />
@@ -141,8 +141,8 @@ export function Banques() {
         </button>
       </header>
 
-      <div className="mb-8">
-        <div className="bg-indigo-600 p-6 rounded-2xl shadow-lg border border-indigo-500 text-white inline-block min-w-[300px]">
+      <div className="mb-5">
+        <div className="bg-indigo-600 p-5 rounded-2xl shadow-lg border border-indigo-500 text-white inline-block min-w-[300px]">
           <div className="flex items-center gap-2 mb-2 opacity-90">
             <Landmark size={18} />
             <span className="text-sm font-bold uppercase tracking-wider">Solde Total Bancaire</span>
@@ -152,14 +152,14 @@ export function Banques() {
       </div>
 
       {isAdding && (
-        <div className="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-md">
+        <div className="mb-5 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm max-w-md">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-slate-700">Nouvelle Banque</h3>
             <button onClick={() => setIsAdding(false)} className="text-slate-400 hover:text-slate-600">
               <X size={18} />
             </button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
               <label className="block text-sm font-semibold text-slate-600 mb-1">Nom de l'institution</label>
               <input
@@ -193,7 +193,7 @@ export function Banques() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {banks.map((bank) => {
           const bankAssets = assets.filter(a => a.bank_id === bank.id);
           const assetsTotal = getBankAssetsTotal(bank.id);
@@ -202,7 +202,7 @@ export function Banques() {
 
           if (isEditing) {
             return (
-              <div key={bank.id} className="bg-white p-6 rounded-2xl shadow-md border-2 border-indigo-200 space-y-4">
+              <div key={bank.id} className="bg-white p-5 rounded-2xl shadow-md border-2 border-indigo-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-slate-700">Modifier l'institution</h3>
                   <button onClick={() => setEditingId(null)} className="text-slate-400">
@@ -243,7 +243,7 @@ export function Banques() {
           }
 
           return (
-            <div key={bank.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
+            <div key={bank.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group">
               <div className="flex items-center justify-between mb-4">
                 <div className="font-bold text-lg text-slate-800">{bank.name}</div>
                 <div className="flex items-center gap-1">
@@ -268,7 +268,7 @@ export function Banques() {
                 </div>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-50">
                   <div className="text-sm font-medium text-slate-500 flex items-center gap-1">
                     <Wallet size={14} /> Solde Bancaire
@@ -305,7 +305,7 @@ export function Banques() {
       </div>
 
       {banks.length === 0 && !isAdding && (
-        <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+        <div className="text-center py-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
           <Building2 size={48} className="mx-auto text-slate-300 mb-4" />
           <p className="text-slate-500 font-medium">Aucune banque enregistrée</p>
           <button

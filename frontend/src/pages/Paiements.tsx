@@ -195,8 +195,8 @@ export function Paiements() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-6">
+      <div className="flex justify-between items-center mb-5">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Paiements</h1>
           <p className="text-slate-500 mt-1">Gérez le remboursement de vos dettes</p>
@@ -204,17 +204,17 @@ export function Paiements() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
+        <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
           <AlertCircle size={20} />
           <p>{error}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Formulaire d'ajout/modification */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 sticky top-8">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 sticky top-8">
+            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {editingId ? <Pencil className="text-orange-500" size={20} /> : <HandCoins className="text-blue-600" size={20} />}
                 {editingId ? "Modifier Paiement" : "Nouveau Paiement"}
@@ -225,7 +225,7 @@ export function Paiements() {
                 </button>
               )}
             </h2>
-            <form onSubmit={handleAddPayment} className="space-y-4">
+            <form onSubmit={handleAddPayment} className="space-y-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date</label>
                 <div className="relative">
@@ -350,24 +350,24 @@ export function Paiements() {
         {/* Liste des paiements */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-50">
+            <div className="p-5 border-b border-slate-50">
               <h2 className="text-lg font-bold text-slate-900">Historique des paiements</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4">Date</th>
-                    <th className="px-6 py-4">Description</th>
-                    <th className="px-6 py-4">De → Vers</th>
-                    <th className="px-6 py-4 text-right">Montant</th>
-                    <th className="px-6 py-4"></th>
+                    <th className="px-4 py-2.5">Date</th>
+                    <th className="px-4 py-2.5">Description</th>
+                    <th className="px-4 py-2.5">De → Vers</th>
+                    <th className="px-4 py-2.5 text-right">Montant</th>
+                    <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {payments.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">
                         Aucun paiement enregistré
                       </td>
                     </tr>
@@ -386,8 +386,8 @@ export function Paiements() {
                       
                       return (
                         <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-4 text-slate-600 text-sm">{payment.date}</td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5 text-slate-600 text-sm">{payment.date}</td>
+                          <td className="px-4 py-2.5">
                             <div className="flex flex-col">
                               <span className="font-semibold text-slate-900">{payment.description}</span>
                               {payment.interest > 0 && (
@@ -397,7 +397,7 @@ export function Paiements() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
                               {bankName ? (
                                 <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
@@ -412,12 +412,12 @@ export function Paiements() {
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-4 py-2.5 text-right">
                             <span className="font-bold text-blue-600">
                               {new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD' }).format(payment.amount)}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-4 py-2.5 text-right">
                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                               <button
                                 onClick={() => handleEdit(payment)}
