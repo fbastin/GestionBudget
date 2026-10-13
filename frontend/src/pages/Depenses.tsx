@@ -313,13 +313,14 @@ export function Depenses() {
           <p className="text-slate-500 mt-1">Suivez vos dépenses et remboursements de dettes</p>
         </div>
         <div className="flex gap-3">
-          <label className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm">
+          <label title="Dépenses, paiements et entrées, au format de l'export" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm">
             <Upload size={18} />
             <span>Importer CSV</span>
             <input type="file" className="hidden" accept=".csv" onChange={handleImport} />
           </label>
           <button 
             onClick={() => exportExpensesCSV()}
+            title="Dépenses, paiements et entrées"
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
           >
             <Download size={18} />

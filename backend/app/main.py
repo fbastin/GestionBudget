@@ -689,8 +689,58 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
             credit_name = p.liability.name
         account_name = f"{bank_name} -> {credit_name}"
         writer.writerow([p.date, p.description, p.amount, p.interest, account_name, 'Remboursement'])
-        
+
+    # Deposits: "source -> account", each side as "Bank: account", "Bank" or Extérieur
+    banks = {b.id: b for b in db.query(models.Bank).all()}
+    assets = db.query(models.Asset).all()
+    for d in db.query(models.Deposit).all():
+        source = csv_account(banks.get(d.source_bank_id), next((a for a in assets if a.id == d.source_asset_id), None), assets)
+        target = csv_account(banks.get(d.bank_id), next((a for a in assets if a.id == d.asset_id), None), assets)
+        writer.writerow([d.date, d.description, d.amount, 0, f"{source} -> {target}", 'Entrée'])
+
     return Response(content=output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename=expenses_export.csv'})
+
+# The source of a deposit received from outside the app's accounts, in the CSV
+EXTERNAL_ACCOUNT = "Extérieur"
+
+def asset_label(asset, assets) -> str:
+    """Name of an account, with its location when another account has the same name (as in the app's lists)."""
+    twin = any(a.id != asset.id and a.name == asset.name for a in assets)
+    return f"{asset.name} ({asset.location})" if twin and asset.location else asset.name
+
+def csv_account(bank, asset, assets) -> str:
+    """One side of a deposit in the CSV: "Bank: account", "Bank" alone, or Extérieur."""
+    if asset:
+        return f"{bank.name if bank else ''}: {asset_label(asset, assets)}"
+    return bank.name if bank else EXTERNAL_ACCOUNT
+
+def parse_csv_side(db: Session, text: str):
+    """(bank_id, asset_id) of one side of a deposit written by csv_account; (None, None) for Extérieur or unknown."""
+    text = text.strip()
+    if not text or text == EXTERNAL_ACCOUNT:
+        return None, None
+    bank_name, _, label = text.partition(": ")
+    bank = db.query(models.Bank).filter(models.Bank.name == bank_name.strip()).first() if bank_name.strip() else None
+    if not label:
+        return (bank.id if bank else None), None
+    assets = db.query(models.Asset).all()
+    asset = next((a for a in assets if asset_label(a, assets) == label.strip() and a.bank_id == (bank.id if bank else None)), None)
+    if not asset:
+        return (bank.id if bank else None), None
+    return asset.bank_id, asset.id
+
+def parse_csv_deposit_account(db: Session, account: str):
+    """(bank_id, asset_id, source_bank_id, source_asset_id) from the Account column of a deposit: "source -> account"."""
+    source, _, target = account.partition(" -> ")
+    return (*parse_csv_side(db, target), *parse_csv_side(db, source))
+
+def count_recorded_deposits(db: Session, date, description: str, amount: float, *accounts) -> int:
+    """Deposits already recorded with these values and accounts (bank, account, source bank, source account)."""
+    return sum(
+        1 for d in db.query(models.Deposit).filter(models.Deposit.date == date).all()
+        if (d.description or '').strip() == description and round(d.amount, 2) == amount
+        and (d.bank_id, d.asset_id, d.source_bank_id, d.source_asset_id) == accounts
+    )
 
 def parse_csv_account(db: Session, account: str, is_payment: bool):
     """(bank_id, credit_id, liability_id) from the Account column written by the export."""
@@ -765,19 +815,36 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
         except ValueError:
             continue
 
+        is_deposit = type_str == 'Entrée'
         is_payment = type_str == 'Remboursement'
-        bank_id, credit_id, liability_id = parse_csv_account(db, account, is_payment)
+        if is_deposit:
+            deposit_accounts = parse_csv_deposit_account(db, account)
+            if not (deposit_accounts[0] or deposit_accounts[1]):
+                continue  # the account receiving it is unknown here
+            key = (models.Deposit, date_val, description, round(amount_val, 2), *deposit_accounts)
+        else:
+            bank_id, credit_id, liability_id = parse_csv_account(db, account, is_payment)
+            model = models.Payment if is_payment else models.Expense
+            key = (model, date_val, description, round(amount_val, 2), round(interest_val, 2) if is_payment else 0,
+                   bank_id, resolve_liability_id(db, liability_id, credit_id))
 
         # Skip transactions already recorded (e.g. a file imported twice). Identical rows of the file are
         # legitimate (two coffees the same day), so only as many occurrences as already recorded are skipped.
-        model = models.Payment if is_payment else models.Expense
-        key = (model, date_val, description, round(amount_val, 2), round(interest_val, 2) if is_payment else 0,
-               bank_id, resolve_liability_id(db, liability_id, credit_id))
         if key not in recorded:
-            recorded[key] = count_recorded_transactions(db, *key)
+            recorded[key] = count_recorded_deposits(db, *key[1:]) if is_deposit else count_recorded_transactions(db, *key)
         occurrences[key] = occurrences.get(key, 0) + 1
         if occurrences[key] <= recorded[key]:
             skipped += 1
+            continue
+
+        if is_deposit:
+            bank_id, asset_id, source_bank_id, source_asset_id = deposit_accounts
+            transaction = models.Deposit(date=date_val, description=description, amount=amount_val, bank_id=bank_id,
+                                         asset_id=asset_id, source_bank_id=source_bank_id, source_asset_id=source_asset_id)
+            db.add(transaction)
+            apply_deposit(db, transaction)
+            db.flush()
+            count += 1
             continue
 
         fields = dict(date=date_val, description=description, amount=amount_val, bank_id=bank_id, credit_id=credit_id, liability_id=liability_id)
