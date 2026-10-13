@@ -1,6 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, JSON, Index, text
+from sqlalchemy import Boolean, Column, Integer, String, Float, Date, ForeignKey, JSON, Index, false, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import TypeDecorator
@@ -66,6 +66,9 @@ class Snapshot(Base):
     asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
     liability_id = Column(Integer, ForeignKey('liabilities.id'), nullable=True)
     amount = Column(Money)
+    # True for a balance the app computed from the transactions. A balance entered or imported (False) is an
+    # observation: corrections at earlier dates do not move it, they stop at it (app/main.py, propagate)
+    derived = Column(Boolean, nullable=False, default=False, server_default=false())
     asset = relationship('Asset', back_populates='snapshots')
     liability = relationship('Liability', back_populates='snapshots')
 

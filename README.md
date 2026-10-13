@@ -68,7 +68,7 @@ L'application est en ligne sur [https://slashbin.net/budget/](https://slashbin.n
 - **un classeur de dettes** (`.xlsx`, local ou récupéré avec [rclone](https://rclone.org/) depuis Google Drive, OneDrive…) : un bloc de lignes, une dette par ligne, son nom dans une colonne et son solde actuel dans une autre ;
 - **un relevé de positions de courtier** (`.csv`) : le plus récent des fichiers d'un dossier qui suivent un motif. Par défaut, le relevé de positions de Wealthsimple (`holdings-report-AAAA-MM-JJ.csv`). La valeur marchande de chaque compte est convertie dans la devise de base, au taux de la Banque du Canada du jour du relevé, ou à un taux fixé.
 
-Sans option, le script ne modifie rien : il écrit un rapport Markdown (soldes de la source et de l'app, écart, éléments sans correspondance, nombre de positions par compte). Avec `--apply debts` ou `--apply accounts`, il enregistre les soldes qui diffèrent comme des relevés datés (date de modification du classeur, date du relevé), par l'API de l'app, qui doit tourner : l'écart est reporté sur les relevés postérieurs, comme pour une saisie à la main. `--only NOM…` limite l'application à certaines lignes.
+Sans option, le script ne modifie rien : il écrit un rapport Markdown (soldes de la source et de l'app, écart, éléments sans correspondance, nombre de positions par compte). Avec `--apply debts` ou `--apply accounts`, il enregistre les soldes qui diffèrent comme des relevés datés (date de modification du classeur, date du relevé), par l'API de l'app, qui doit tourner : l'écart est reporté sur les soldes calculés qui suivent, jusqu'au prochain solde saisi ou importé, comme pour une saisie à la main. `--only NOM…` limite l'application à certaines lignes.
 
 Mise en route :
 
@@ -104,6 +104,7 @@ La configuration et le rapport contiennent des noms et des montants personnels :
 
 - **Tableau de bord** : Vue d'ensemble des Actifs, Passifs et Valeur Nette. Les graphes d'évolution placent les relevés sur une échelle de temps : des soldes annuels anciens et des relevés récents rapprochés y gardent leur juste place. La valeur nette commence à la première valeur d'actif enregistrée ; avant elle, les dettes seules en donneraient une fausse.
 - **Suivi des Dettes** : Liste détaillée et graphique d'évolution historique.
+- **Soldes saisis et soldes calculés** : un solde saisi ou importé est une observation. Une correction ou une transaction datée d'avant ne le déplace pas : elle se reporte sur les soldes calculés par l'app qui la suivent, jusqu'à ce solde. Une transaction s'applique aussi au solde de son propre jour.
 - **Gestion du Patrimoine** : Centralisation des biens immobiliers et comptes bancaires.
 - **Investissements** : Répertoire des stocks et dividendes canadiens.
 

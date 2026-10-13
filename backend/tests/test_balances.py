@@ -7,7 +7,8 @@ CSV_HEADER = "Date,Description,Amount,Interest,Account,Type\n"
 
 @pytest.fixture
 def accounts(client):
-    """A "Visa" debt of 1000 (credit "Visa") and a "Compte" account of 5000 at the bank "Banque"."""
+    """A "Visa" debt of 1000 (credit "Visa"), entered on 2026-01-01 and on 2026-06-01, and a "Compte" account of
+    5000 at the bank "Banque". The entered balance of 2026-06-01 already counts what happened before it."""
     debt = create(client, "/liabilities", name="Visa", type="Carte de crédit")
     create(client, "/snapshots", date="2026-01-01", amount=1000, liability_id=debt["id"])
     create(client, "/snapshots", date="2026-06-01", amount=1000, liability_id=debt["id"])
@@ -22,9 +23,9 @@ def from_account(accounts):
     return {"bank_id": accounts["bank"], "asset_id": accounts["account"]}
 
 
-def test_expense_on_a_credit_adds_to_the_debt_from_its_date(client, accounts):
+def test_expense_on_a_credit_adds_to_the_debt_until_the_next_entered_balance(client, accounts):
     create(client, "/expenses", date="2026-03-01", description="Épicerie", amount=200, credit_id=accounts["credit"])
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 1200, "2026-06-01": 1200}
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 1200, "2026-06-01": 1000}
 
 
 def test_expense_from_an_account_is_taken_from_it(client, accounts):
@@ -41,7 +42,7 @@ def test_expense_from_a_bank_without_account_updates_the_bank_balance(client):
 def test_payment_repays_the_capital_only(client, accounts):
     create(client, "/payments", date="2026-02-01", description="Hypothèque", amount=300, interest=50,
            liability_id=accounts["debt"], **from_account(accounts))
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-02-01": 750, "2026-06-01": 750}
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-02-01": 750, "2026-06-01": 1000}
     assert balances(client, "assets", accounts["account"]) == {"2026-01-01": 5000, "2026-02-01": 4700}
 
 
@@ -49,7 +50,7 @@ def test_editing_an_expense_moves_its_impact(client, accounts):
     expense = create(client, "/expenses", date="2026-03-01", description="x", amount=200, credit_id=accounts["credit"])
     assert client.patch(f"/expenses/{expense['id']}", json={"date": "2026-02-01", "amount": 250}).status_code == 200
     assert balances(client, "liabilities", accounts["debt"]) == {
-        "2026-01-01": 1000, "2026-02-01": 1250, "2026-03-01": 1250, "2026-06-01": 1250}
+        "2026-01-01": 1000, "2026-02-01": 1250, "2026-03-01": 1250, "2026-06-01": 1000}
 
 
 def test_editing_a_payment_can_move_it_to_another_debt(client, accounts):
@@ -81,16 +82,38 @@ def test_csv_import_applies_every_row(client, accounts):
            "2026-03-01,C,20,0,Crédit: Visa,Dépense\n"
            "2026-03-01,D,300,0,Banque -> Visa,Remboursement\n")
     assert balances(client, "liabilities", accounts["debt"]) == {
-        "2026-01-01": 1000, "2026-02-01": 1150, "2026-03-01": 870, "2026-06-01": 870}
+        "2026-01-01": 1000, "2026-02-01": 1150, "2026-03-01": 870, "2026-06-01": 1000}
     assert balances(client, "assets", accounts["account"]) == {"2026-01-01": 5000, "2026-03-01": 4700}
 
 
-def test_setting_a_balance_shifts_the_later_snapshots_until_deleted(client, accounts):
-    create(client, "/snapshots", date="2026-03-01", amount=1500, liability_id=accounts["debt"])
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 1500, "2026-06-01": 1500}
-    snapshot = next(s for s in item_snapshots(client, "liabilities", accounts["debt"]) if s["date"] == "2026-03-01")
-    assert client.delete(f"/snapshots/{snapshot['id']}").status_code == 200
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-06-01": 1000}
+def snapshot_id(client, kind, item_id, day):
+    return next(s["id"] for s in item_snapshots(client, kind, item_id) if s["date"] == day)
+
+
+def test_setting_a_balance_shifts_the_computed_ones_after_it_until_deleted(client, accounts):
+    create(client, "/expenses", date="2026-03-01", description="x", amount=200, credit_id=accounts["credit"])
+    create(client, "/snapshots", date="2026-02-01", amount=1500, liability_id=accounts["debt"])
+    # The computed balance of 2026-03-01 follows; the entered one of 2026-06-01 does not
+    assert balances(client, "liabilities", accounts["debt"]) == {
+        "2026-01-01": 1000, "2026-02-01": 1500, "2026-03-01": 1700, "2026-06-01": 1000}
+    assert client.delete(f"/snapshots/{snapshot_id(client, 'liabilities', accounts['debt'], '2026-02-01')}").status_code == 200
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 1200, "2026-06-01": 1000}
+
+
+def test_deleting_an_old_balance_leaves_the_later_entered_ones_alone(client, accounts):
+    # Deleting the first balance used to shift every later one by its amount
+    assert client.delete(f"/snapshots/{snapshot_id(client, 'liabilities', accounts['debt'], '2026-01-01')}").status_code == 200
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-06-01": 1000}
+    assert client.get("/dashboard").json()["total_liabilities"] == 1000
+
+
+def test_editing_a_computed_balance_makes_it_an_entered_one(client, accounts):
+    create(client, "/expenses", date="2026-03-01", description="x", amount=200, credit_id=accounts["credit"])
+    create(client, "/snapshots", date="2026-03-01", amount=1150, liability_id=accounts["debt"])
+    # An expense dated before it no longer moves it
+    create(client, "/expenses", date="2026-02-01", description="y", amount=40, credit_id=accounts["credit"])
+    assert balances(client, "liabilities", accounts["debt"]) == {
+        "2026-01-01": 1000, "2026-02-01": 1040, "2026-03-01": 1150, "2026-06-01": 1000}
 
 
 def test_reimporting_the_export_changes_nothing(client, accounts):
@@ -119,7 +142,7 @@ def test_converting_an_expense_into_a_payment(client, accounts):
     response = client.post(f"/expenses/{expense['id']}/convert-to-payment", json={
         "date": "2026-03-01", "description": "Remboursement", "amount": 100, "credit_id": accounts["credit"], **from_account(accounts)})
     assert response.status_code == 200, response.text
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 900, "2026-06-01": 900}
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-03-01": 900, "2026-06-01": 1000}
     assert balances(client, "assets", accounts["account"]) == {"2026-01-01": 5000, "2026-03-01": 4900}
     assert client.get("/expenses").json() == [] and len(client.get("/payments").json()) == 1
 
@@ -130,7 +153,7 @@ def test_converting_a_payment_into_an_expense(client, accounts):
     response = client.post(f"/payments/{payment['id']}/convert-to-expense", json={
         "date": "2026-02-01", "description": "Achat", "amount": 50, "credit_id": accounts["credit"]})
     assert response.status_code == 200, response.text
-    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-02-01": 1050, "2026-06-01": 1050}
+    assert balances(client, "liabilities", accounts["debt"]) == {"2026-01-01": 1000, "2026-02-01": 1050, "2026-06-01": 1000}
     assert balances(client, "assets", accounts["account"]) == {"2026-01-01": 5000, "2026-02-01": 5000}
     assert client.get("/payments").json() == [] and len(client.get("/expenses").json()) == 1
 

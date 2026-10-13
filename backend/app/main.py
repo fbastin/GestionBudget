@@ -39,6 +39,20 @@ def handle_integrity_error(request: Request, exc: IntegrityError):
 
 database.init_db()
 
+def propagate(db: Session, snapshot_column, item_id: int, day, delta: float, include_day: bool = False):
+    """Add delta to the balances of an account or debt after day (from day on when include_day), up to the next
+    balance entered or imported: that one is an observation, which already counts what happened before it.
+    A transaction (include_day) also moves the balance of its own day, whatever its origin."""
+    later = db.query(models.Snapshot).filter(snapshot_column == item_id, models.Snapshot.date >= day)
+    for s in later.order_by(models.Snapshot.date.asc()):
+        if s.date == day:
+            if include_day:
+                s.amount += delta
+            continue
+        if not s.derived:
+            break
+        s.amount += delta
+
 def apply_bank_impact(db: Session, bank_id: Optional[int], amount: float, date, multiplier: int = 1, asset_id: Optional[int] = None):
     """
     Apply or reverse (multiplier=-1) the impact of a payment/expense.
@@ -68,17 +82,13 @@ def apply_bank_impact(db: Session, bank_id: Optional[int], amount: float, date, 
                 return
 
     if target_asset:
-        # Update snapshots of the target asset
-        snapshots = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date >= date).all()
-        for s in snapshots:
-            s.amount -= impact
-        
+        propagate(db, models.Snapshot.asset_id, target_asset.id, date, -impact, include_day=True)
         if multiplier > 0:
             exact = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date == date).first()
             if not exact:
                 latest = db.query(models.Snapshot).filter(models.Snapshot.asset_id == target_asset.id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
                 base = latest.amount if latest else 0
-                db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact))
+                db.add(models.Snapshot(date=date, asset_id=target_asset.id, amount=base - impact, derived=True))
 
 def resolve_liability_id(db: Session, liability_id: Optional[int], credit_id: Optional[int]) -> Optional[int]:
     """Debt affected by a transaction: the one chosen directly, otherwise the one behind the credit."""
@@ -91,18 +101,16 @@ def resolve_liability_id(db: Session, liability_id: Optional[int], credit_id: Op
     return None
 
 def apply_liability_impact(db: Session, liability_id: Optional[int], delta: float, date, create_snapshot: bool = True):
-    """Add delta to the debt's snapshots from date onwards and, when applying, make sure one exists at date."""
+    """Add delta to the debt's balances from date on (see propagate) and, when applying, make sure one exists at date."""
     if not liability_id:
         return
-    snapshots = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date >= date).all()
-    for s in snapshots:
-        s.amount += delta
+    propagate(db, models.Snapshot.liability_id, liability_id, date, delta, include_day=True)
     if create_snapshot:
         exact = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date == date).first()
         if not exact:
             latest = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability_id, models.Snapshot.date < date).order_by(models.Snapshot.date.desc()).first()
             base = latest.amount if latest else 0
-            db.add(models.Snapshot(date=date, liability_id=liability_id, amount=base + delta))
+            db.add(models.Snapshot(date=date, liability_id=liability_id, amount=base + delta, derived=True))
 
 def apply_expense(db: Session, expense, multiplier: int = 1):
     """Apply (multiplier=1) or reverse (-1) an expense: it leaves the bank account and adds to the debt."""
@@ -270,45 +278,30 @@ def create_snapshot(snapshot: schemas.SnapshotCreate, db: Session = Depends(data
         db.rollback()
         return save_snapshot(db, snapshot)
 
-def save_snapshot(db: Session, snapshot: schemas.SnapshotCreate):
-    # Check if a snapshot already exists for this item on this date
-    existing = None
+def snapshot_target(snapshot):
+    """Column and id of the account or debt a snapshot belongs to."""
     if snapshot.asset_id:
-        existing = db.query(models.Snapshot).filter(models.Snapshot.asset_id == snapshot.asset_id, models.Snapshot.date == snapshot.date).first()
-    elif snapshot.liability_id:
-        existing = db.query(models.Snapshot).filter(models.Snapshot.liability_id == snapshot.liability_id, models.Snapshot.date == snapshot.date).first()
-    
+        return models.Snapshot.asset_id, snapshot.asset_id
+    return models.Snapshot.liability_id, snapshot.liability_id
+
+def save_snapshot(db: Session, snapshot: schemas.SnapshotCreate):
+    """Record a balance entered or imported: it becomes an observation, and the balances computed after it
+    move by the difference (see propagate)."""
+    column, item_id = snapshot_target(snapshot)
+    existing = db.query(models.Snapshot).filter(column == item_id, models.Snapshot.date == snapshot.date).first()
     if existing:
         delta = snapshot.amount - existing.amount
         existing.amount = snapshot.amount
-        
-        # Propagate to future
-        if snapshot.asset_id:
-            future = db.query(models.Snapshot).filter(models.Snapshot.asset_id == snapshot.asset_id, models.Snapshot.date > snapshot.date).all()
-        else:
-            future = db.query(models.Snapshot).filter(models.Snapshot.liability_id == snapshot.liability_id, models.Snapshot.date > snapshot.date).all()
-        for s in future:
-            s.amount += delta
-            
+        existing.derived = False
+        propagate(db, column, item_id, snapshot.date, delta)
         db.commit()
         db.refresh(existing)
         return existing
-    
-    # New snapshot: propagate delta relative to the state at that date
-    if snapshot.asset_id:
-        prev = db.query(models.Snapshot).filter(models.Snapshot.asset_id == snapshot.asset_id, models.Snapshot.date < snapshot.date).order_by(models.Snapshot.date.desc()).first()
-        base = prev.amount if prev else 0
-        delta = snapshot.amount - base
-        future = db.query(models.Snapshot).filter(models.Snapshot.asset_id == snapshot.asset_id, models.Snapshot.date > snapshot.date).all()
-    else:
-        prev = db.query(models.Snapshot).filter(models.Snapshot.liability_id == snapshot.liability_id, models.Snapshot.date < snapshot.date).order_by(models.Snapshot.date.desc()).first()
-        base = prev.amount if prev else 0
-        delta = snapshot.amount - base
-        future = db.query(models.Snapshot).filter(models.Snapshot.liability_id == snapshot.liability_id, models.Snapshot.date > snapshot.date).all()
-        
-    for s in future:
-        s.amount += delta
-        
+
+    # New balance: the difference with the one in force at that date
+    prev = db.query(models.Snapshot).filter(column == item_id, models.Snapshot.date < snapshot.date).order_by(models.Snapshot.date.desc()).first()
+    base = prev.amount if prev else 0
+    propagate(db, column, item_id, snapshot.date, snapshot.amount - base)
     db_snapshot = models.Snapshot(**snapshot.model_dump())
     db.add(db_snapshot)
     db.commit()
@@ -320,20 +313,12 @@ def delete_snapshot(snapshot_id: int, db: Session = Depends(database.get_db)):
     db_snapshot = db.query(models.Snapshot).filter(models.Snapshot.id == snapshot_id).first()
     if not db_snapshot:
         raise HTTPException(status_code=404, detail='Snapshot not found')
-    
-    if db_snapshot.asset_id:
-        prev = db.query(models.Snapshot).filter(models.Snapshot.asset_id == db_snapshot.asset_id, models.Snapshot.date < db_snapshot.date).order_by(models.Snapshot.date.desc()).first()
-        base = prev.amount if prev else 0
-        delta = db_snapshot.amount - base
-        future = db.query(models.Snapshot).filter(models.Snapshot.asset_id == db_snapshot.asset_id, models.Snapshot.date > db_snapshot.date).all()
-    else:
-        prev = db.query(models.Snapshot).filter(models.Snapshot.liability_id == db_snapshot.liability_id, models.Snapshot.date < db_snapshot.date).order_by(models.Snapshot.date.desc()).first()
-        base = prev.amount if prev else 0
-        delta = db_snapshot.amount - base
-        future = db.query(models.Snapshot).filter(models.Snapshot.liability_id == db_snapshot.liability_id, models.Snapshot.date > db_snapshot.date).all()
 
-    for s in future:
-        s.amount -= delta
+    # The balances computed after it go back to the one in force before it
+    column, item_id = snapshot_target(db_snapshot)
+    prev = db.query(models.Snapshot).filter(column == item_id, models.Snapshot.date < db_snapshot.date).order_by(models.Snapshot.date.desc()).first()
+    base = prev.amount if prev else 0
+    propagate(db, column, item_id, db_snapshot.date, base - db_snapshot.amount)
 
     db.delete(db_snapshot)
     db.commit()
@@ -824,6 +809,7 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
                 existing = db.query(models.Snapshot).filter(models.Snapshot.asset_id == asset.id, models.Snapshot.date == date_val).first()
                 if existing:
                     existing.amount = amount_val
+                    existing.derived = False  # an imported balance is an observation
                 else:
                     db.add(models.Snapshot(asset_id=asset.id, amount=amount_val, date=date_val))
                 count += 1
@@ -833,6 +819,7 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(databas
                 existing = db.query(models.Snapshot).filter(models.Snapshot.liability_id == liability.id, models.Snapshot.date == date_val).first()
                 if existing:
                     existing.amount = amount_val
+                    existing.derived = False  # an imported balance is an observation
                 else:
                     db.add(models.Snapshot(liability_id=liability.id, amount=amount_val, date=date_val))
                 count += 1
