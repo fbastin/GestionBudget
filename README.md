@@ -26,7 +26,7 @@ bash start_app.sh
 L'application sera disponible sur [http://localhost:5173](http://localhost:5173).
 
 ### Base de données et migrations
-Au démarrage, le backend met la base à jour avec les migrations Alembic (`backend/migrations/`). Avant d'appliquer une migration, il copie la base dans `backend/finance.db.bak-<date>-avant-migration-<révision>`.
+Au démarrage, le backend met la base à jour avec les migrations Alembic (`backend/migrations/`). Avant d'appliquer une migration, il copie la base dans `backend/finance.db.bak-<date>-avant-migration-<révision>`. Seules les 3 copies les plus récentes de ce type (`finance.db.bak-*`) sont gardées.
 
 Après une modification de `backend/app/models.py`, créez la migration correspondante :
 

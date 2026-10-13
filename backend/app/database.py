@@ -1,3 +1,4 @@
+import glob
 import os
 import sqlite3
 from datetime import datetime
@@ -27,8 +28,12 @@ def alembic_config():
     config.attributes["configure_logger"] = False
     return config
 
+# Copies of the database kept next to it, the latest ones (backup_database)
+KEPT_BACKUPS = 3
+
 def backup_database(label):
-    """Copy the database next to it before it is changed, e.g. finance.db.bak-20261011-143000-avant-migration-0002."""
+    """Copy the database next to it before it is changed, e.g. finance.db.bak-20261011-143000-avant-migration-0002,
+    and keep only the KEPT_BACKUPS latest of these copies."""
     path = f"{DB_PATH}.bak-{datetime.now():%Y%m%d-%H%M%S}-{label}"
     source, target = sqlite3.connect(DB_PATH), sqlite3.connect(path)
     try:
@@ -37,6 +42,10 @@ def backup_database(label):
         source.close()
         target.close()
     print(f"Sauvegarde de la base avant migration : {path}")
+    # Only the latest copies stay next to the database: the nightly backup keeps the history
+    for old in sorted(glob.glob(f"{glob.escape(DB_PATH)}.bak-*"))[:-KEPT_BACKUPS]:
+        os.remove(old)
+        print(f"Ancienne sauvegarde supprimée : {old}")
 
 def init_db():
     """Bring the database schema up to date with the migrations, after backing up an existing database."""

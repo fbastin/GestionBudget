@@ -107,3 +107,18 @@ def test_existing_balances_on_a_transaction_date_are_marked_computed(other_datab
     with engine.connect() as connection:
         derived = dict(connection.execute(text("SELECT id, derived FROM snapshots")).all())
     assert derived == {1: 0, 2: 1, 3: 0, 4: 1}
+
+
+def test_only_the_latest_backups_are_kept(other_database):
+    path, engine = other_database
+    create_legacy_database(engine, [(1, "2026-01-01", 1000)])
+    older = [path.parent / f"finance.db.bak-2026010{i}-120000-avant-migration-000{i}" for i in range(1, 5)]
+    for backup in older:
+        backup.write_bytes(b"")
+    database.init_db()
+    kept = sorted(p.name for p in path.parent.glob("finance.db.bak-*"))
+    # The two latest older copies, then the one made by this migration
+    assert len(kept) == database.KEPT_BACKUPS == 3
+    assert kept[:2] == [older[2].name, older[3].name]
+    assert path.exists()
+
