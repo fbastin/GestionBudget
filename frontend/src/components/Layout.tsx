@@ -15,10 +15,12 @@ export function Layout() {
     { path: "/reer", label: "REER", icon: <Landmark size={20} /> },
   ];
 
+  // Screen-high shell: the main content scrolls inside it, so the sidebar stays in place and the sticky
+  // elements of the pages (the forms of Dépenses and Paiements) stick to the top of that content
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex h-dvh bg-slate-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col">
+      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col overflow-y-auto">
         <div className="p-6 border-b border-slate-100">
           <div className="flex items-center gap-3 text-blue-600">
             <div className="bg-blue-600 p-1.5 rounded-lg text-white">
@@ -60,7 +62,7 @@ export function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto">
         {/* Mobile Nav */}
         <header className="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
           <span className="font-bold text-slate-900">FinanceLib</span>

@@ -213,7 +213,8 @@ export function Paiements() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Formulaire d'ajout/modification */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 sticky top-8">
+          {/* Stays in view while the history scrolls; scrolls itself if taller than the screen */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
             <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {editingId ? <Pencil className="text-orange-500" size={20} /> : <HandCoins className="text-blue-600" size={20} />}
