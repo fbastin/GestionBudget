@@ -189,6 +189,35 @@ class Payment(PaymentBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+class DepositBase(BaseModel):
+    date: dt_date
+    description: str
+    amount: Money
+    bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
+    source_bank_id: Optional[int] = None
+    source_asset_id: Optional[int] = None
+
+class DepositCreate(DepositBase):
+    @model_validator(mode='after')
+    def check_account(self):
+        if self.bank_id is None and self.asset_id is None:
+            raise ValueError('The account receiving the money (bank_id or asset_id) is required')
+        return self
+
+class DepositUpdate(BaseModel):
+    date: Optional[dt_date] = None
+    description: Optional[str] = None
+    amount: Optional[Money] = None
+    bank_id: Optional[int] = None
+    asset_id: Optional[int] = None
+    source_bank_id: Optional[int] = None
+    source_asset_id: Optional[int] = None
+
+class Deposit(DepositBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class ContributionBase(BaseModel):
 
     year: int

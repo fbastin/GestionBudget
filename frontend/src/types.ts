@@ -58,6 +58,18 @@ export interface Payment extends Expense {
   interest: number;
 }
 
+// Money coming into an account; with a source account, a transfer between two accounts of the app
+export interface Deposit {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  bank_id: number | null;
+  asset_id: number | null;
+  source_bank_id: number | null;
+  source_asset_id: number | null;
+}
+
 // Payloads sent to the API
 export type LiabilityInput = { name: string; type: string };
 export type AssetInput = Partial<Omit<Asset, "id" | "snapshots">>;
@@ -74,3 +86,4 @@ export type InvestmentInput = {
 };
 export type ExpenseInput = Omit<Expense, "id">;
 export type PaymentInput = Omit<Payment, "id">;
+export type DepositInput = Omit<Deposit, "id">;

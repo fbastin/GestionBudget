@@ -129,6 +129,19 @@ class Expense(Base):
     credit = relationship('Credit', back_populates='expenses')
     liability = relationship('Liability')
 
+class Deposit(Base):
+    """Money coming into an account: a pay, a transfer received. With a source account, the amount also
+    leaves that one (a transfer between two accounts of the app)."""
+    __tablename__ = 'deposits'
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date)
+    description = Column(String)
+    amount = Column(Money)
+    bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
+    source_bank_id = Column(Integer, ForeignKey('banks.id'), nullable=True)
+    source_asset_id = Column(Integer, ForeignKey('assets.id'), nullable=True)
+
 class Payment(Base):
     __tablename__ = 'payments'
     id = Column(Integer, primary_key=True, index=True)

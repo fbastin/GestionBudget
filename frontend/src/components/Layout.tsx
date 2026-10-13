@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Building2, ChevronRight, CreditCard, TrendingUp, Landmark, Receipt, HandCoins } from "lucide-react";
+import { LayoutDashboard, Building2, ChevronRight, CreditCard, TrendingUp, Landmark, Receipt, HandCoins, BanknoteArrowDown } from "lucide-react";
 
 export function Layout() {
   const location = useLocation();
@@ -8,6 +8,7 @@ export function Layout() {
     { path: "/", label: "Actifs/Passifs", icon: <LayoutDashboard size={20} /> },
     { path: "/depenses", label: "Dépenses", icon: <Receipt size={20} /> },
     { path: "/paiements", label: "Paiements", icon: <HandCoins size={20} /> },
+    { path: "/entrees", label: "Entrées", icon: <BanknoteArrowDown size={20} /> },
     { path: "/investissements", label: "Investissements", icon: <TrendingUp size={20} /> },
     { path: "/banques", label: "Banques", icon: <Building2 size={20} /> },
     { path: "/credits", label: "Crédits", icon: <CreditCard size={20} /> },
@@ -16,7 +17,7 @@ export function Layout() {
   ];
 
   // Screen-high shell: the main content scrolls inside it, so the sidebar stays in place and the sticky
-  // elements of the pages (the forms of Dépenses and Paiements) stick to the top of that content
+  // elements of the pages (the forms of Dépenses, Paiements and Entrées) stick to the top of that content
   return (
     <div className="flex h-dvh bg-slate-50">
       {/* Sidebar */}

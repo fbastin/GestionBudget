@@ -4,6 +4,8 @@ import type {
   BankInput,
   ContributionInput,
   CreditInput,
+  Deposit,
+  DepositInput,
   ExpenseInput,
   InvestmentInput,
   LiabilityInput,
@@ -67,6 +69,11 @@ export const getPayments = () => api.get("/payments");
 export const createPayment = (data: PaymentInput) => api.post("/payments", data);
 export const updatePayment = (id: number, data: Partial<PaymentInput>) => api.patch("/payments/" + id, data);
 export const deletePayment = (id: number) => api.delete("/payments/" + id);
+
+export const getDeposits = () => api.get<Deposit[]>("/deposits");
+export const createDeposit = (data: DepositInput) => api.post("/deposits", data);
+export const updateDeposit = (id: number, data: Partial<DepositInput>) => api.patch("/deposits/" + id, data);
+export const deleteDeposit = (id: number) => api.delete("/deposits/" + id);
 // Replace an expense by a payment (or the reverse) in a single server-side operation
 export const convertExpenseToPayment = (id: number, data: PaymentInput) => api.post(`/expenses/${id}/convert-to-payment`, data);
 export const convertPaymentToExpense = (id: number, data: ExpenseInput) => api.post(`/payments/${id}/convert-to-expense`, data);

@@ -119,6 +119,13 @@ def apply_expense(db: Session, expense, multiplier: int = 1):
     liability_id = resolve_liability_id(db, expense.liability_id, expense.credit_id)
     apply_liability_impact(db, liability_id, expense.amount * multiplier, expense.date, create_snapshot=multiplier > 0)
 
+def apply_deposit(db: Session, deposit, multiplier: int = 1):
+    """Apply (multiplier=1) or reverse (-1) a deposit: it comes into its account and leaves its source account, if any."""
+    if deposit.bank_id or deposit.asset_id:
+        apply_bank_impact(db, deposit.bank_id, -deposit.amount, deposit.date, multiplier, asset_id=deposit.asset_id)
+    if deposit.source_bank_id or deposit.source_asset_id:
+        apply_bank_impact(db, deposit.source_bank_id, deposit.amount, deposit.date, multiplier, asset_id=deposit.source_asset_id)
+
 def apply_payment(db: Session, payment, multiplier: int = 1):
     """Apply (multiplier=1) or reverse (-1) a payment: it leaves the bank account and repays the capital of the debt."""
     if payment.bank_id:
@@ -350,7 +357,10 @@ def update_bank(bank_id: int, bank_update: schemas.BankUpdate, db: Session = Dep
 
 def ensure_no_transactions(db: Session, column: str, value: int, label: str):
     """Refuse to delete an account still used by transactions: their impact could no longer be reversed."""
-    count = sum(db.query(model).filter(getattr(model, column) == value).count() for model in (models.Expense, models.Payment))
+    count = sum(db.query(model).filter(getattr(model, column) == value).count()
+                for model in (models.Expense, models.Payment, models.Deposit) if hasattr(model, column))
+    if column == 'bank_id':
+        count += db.query(models.Deposit).filter(models.Deposit.source_bank_id == value).count()
     if count:
         raise HTTPException(status_code=409, detail=f"Impossible de supprimer {label} : {count} transaction(s) y sont liées. Supprimez-les ou changez leur compte d'abord.")
 
@@ -585,6 +595,42 @@ def delete_payment(payment_id: int, db: Session = Depends(database.get_db)):
     db.delete(db_payment)
     db.commit()
     return {'message': 'Payment deleted'}
+
+@app.get('/deposits', response_model=List[schemas.Deposit])
+def get_deposits(db: Session = Depends(database.get_db)):
+    return db.query(models.Deposit).order_by(models.Deposit.date.desc()).all()
+
+@app.post('/deposits', response_model=schemas.Deposit)
+def create_deposit(deposit: schemas.DepositCreate, db: Session = Depends(database.get_db)):
+    db_deposit = models.Deposit(**deposit.model_dump())
+    db.add(db_deposit)
+    apply_deposit(db, db_deposit)
+    db.commit()
+    db.refresh(db_deposit)
+    return db_deposit
+
+@app.patch('/deposits/{deposit_id}', response_model=schemas.Deposit)
+def update_deposit(deposit_id: int, deposit_update: schemas.DepositUpdate, db: Session = Depends(database.get_db)):
+    db_deposit = db.query(models.Deposit).filter(models.Deposit.id == deposit_id).first()
+    if not db_deposit:
+        raise HTTPException(status_code=404, detail='Deposit not found')
+    apply_deposit(db, db_deposit, multiplier=-1)
+    for key, value in deposit_update.model_dump(exclude_unset=True).items():
+        setattr(db_deposit, key, value)
+    apply_deposit(db, db_deposit)
+    db.commit()
+    db.refresh(db_deposit)
+    return db_deposit
+
+@app.delete('/deposits/{deposit_id}')
+def delete_deposit(deposit_id: int, db: Session = Depends(database.get_db)):
+    db_deposit = db.query(models.Deposit).filter(models.Deposit.id == deposit_id).first()
+    if not db_deposit:
+        raise HTTPException(status_code=404, detail='Deposit not found')
+    apply_deposit(db, db_deposit, multiplier=-1)
+    db.delete(db_deposit)
+    db.commit()
+    return {'message': 'Deposit deleted'}
 
 @app.post('/expenses/{expense_id}/convert-to-payment', response_model=schemas.Payment)
 def convert_expense_to_payment(expense_id: int, payment: schemas.PaymentCreate, db: Session = Depends(database.get_db)):

@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { ActifsPassifs } from "./pages/ActifsPassifs";
 import { Depenses } from "./pages/Depenses";
 import { Paiements } from "./pages/Paiements";
+import { Entrees } from "./pages/Entrees";
 import { Banques } from "./pages/Banques";
 import { Credits } from "./pages/Credits";
 import { RegisteredAccount } from "./pages/RegisteredAccount";
@@ -19,6 +20,7 @@ function App() {
           <Route path="/" element={<ActifsPassifs />} />
           <Route path="/depenses" element={<Depenses />} />
           <Route path="/paiements" element={<Paiements />} />
+          <Route path="/entrees" element={<Entrees />} />
           <Route path="/investissements" element={<Investissements />} />
           <Route path="/banques" element={<Banques />} />
           <Route path="/credits" element={<Credits />} />

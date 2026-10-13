@@ -32,7 +32,8 @@ import {
   Upload, 
   Edit2, 
   ChevronRight, 
-  History as HistoryIcon 
+  History as HistoryIcon,
+  TriangleAlert
 } from "lucide-react";
 import { 
   LineChart, 
@@ -79,6 +80,8 @@ interface Bank {
   id: number;
   name: string;
 }
+
+const NEGATIVE_HINT = "Solde négatif : il manque sans doute une entrée d'argent, ou le solde réel est à saisir.";
 
 interface HistoryItem {
   date: string;
@@ -166,6 +169,12 @@ export function ActifsPassifs() {
   const [error, setError] = useState<string | null>(null);
 
   const todayStr = todayLocal();
+
+  // Current value of an account: its last balance up to today, or its fixed value
+  const assetAmount = (a: Asset) => {
+    const snapshots = [...a.snapshots].filter(s => s.date <= todayStr).sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
+    return snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
+  };
 
   // State only changes in the promise callbacks, once the requests are done: the initial load can run in an effect
   const loadData = () =>
@@ -357,6 +366,7 @@ export function ActifsPassifs() {
   const points = toPoints(history);
   // The net worth needs the assets: it starts at their first recorded value
   const netWorthPoints = points.filter((p) => p.net_worth !== null);
+  const negativeAssets = assets.filter((a) => assetAmount(a) < 0);
 
   return (
     <div className="p-4 md:p-6 font-sans text-slate-900">
@@ -389,6 +399,17 @@ export function ActifsPassifs() {
           </button>
         </div>
       </header>
+
+      {negativeAssets.length > 0 && (
+        <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-800 text-sm">
+          <TriangleAlert size={20} className="shrink-0 mt-0.5" />
+          <p>
+            Solde négatif : {negativeAssets.map((a) => `${a.name} (${money(assetAmount(a))})`).join(", ")}.
+            Il manque sans doute une entrée d'argent (page <Link to="/entrees" className="underline font-semibold">Entrées</Link>),
+            ou le solde réel est à saisir.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
@@ -755,8 +776,7 @@ export function ActifsPassifs() {
 
           <div className="space-y-3">
             {assets.map((a) => {
-              const snapshots = [...a.snapshots].filter(s => s.date <= todayStr).sort((x,y) => new Date(x.date).getTime() - new Date(y.date).getTime() || x.id - y.id);
-              const currentAmount = snapshots[snapshots.length - 1]?.amount || a.details?.value || 0;
+              const currentAmount = assetAmount(a);
               
               if (editingAssetMetadataId === a.id) {
                 return (
@@ -894,7 +914,10 @@ export function ActifsPassifs() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-emerald-600 text-lg">
+                    {currentAmount < 0 && (
+                      <span title={NEGATIVE_HINT}><TriangleAlert size={16} className="text-amber-500" /></span>
+                    )}
+                    <span className={`font-bold text-lg ${currentAmount < 0 ? "text-rose-600" : "text-emerald-600"}`}>
                       {money(currentAmount)}
                     </span>
                   </div>

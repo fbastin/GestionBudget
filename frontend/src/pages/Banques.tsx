@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getBanks, createBank, deleteBank, updateBank, getAssets, errorMessage } from "../api";
-import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2 } from "lucide-react";
+import { Building2, Plus, Trash2, Save, X, Landmark, Wallet, Edit2, TriangleAlert } from "lucide-react";
 import { money } from "../format";
 
 interface Snapshot {
@@ -280,12 +280,21 @@ export function Banques() {
                 {bankAssets.length > 0 && (
                   <div className="space-y-2">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Comptes liés (CELI/REER/Actifs)</div>
-                    {bankAssets.map(a => (
-                      <div key={a.id} className="flex items-center justify-between text-xs">
-                        <span className="text-slate-600">{a.name}</span>
-                        <span className="font-semibold text-slate-800">{money(a.snapshots?.[a.snapshots.length - 1]?.amount || 0)}</span>
-                      </div>
-                    ))}
+                    {bankAssets.map(a => {
+                      const amount = a.snapshots?.[a.snapshots.length - 1]?.amount || 0;
+                      return (
+                        <div key={a.id} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-600">{a.name}</span>
+                          {amount < 0 ? (
+                            <span className="font-semibold text-rose-600 flex items-center gap-1" title="Solde négatif : il manque sans doute une entrée d'argent, ou le solde réel est à saisir.">
+                              <TriangleAlert size={12} className="text-amber-500" />{money(amount)}
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-slate-800">{money(amount)}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                     <div className="pt-1 flex items-center justify-between text-xs border-t border-slate-50">
                       <span className="text-slate-400 italic">Sous-total actifs</span>
                       <span className="font-bold text-emerald-600">{money(assetsTotal)}</span>

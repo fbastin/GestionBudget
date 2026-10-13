@@ -34,12 +34,13 @@ def revision(engine):
 
 def create_legacy_database(engine, snapshots):
     """Database created before migrations existed: no version table, no unique snapshot indexes, no origin of
-    the balances."""
+    the balances, no deposits."""
     models.Base.metadata.create_all(engine)
     with engine.begin() as connection:
         connection.execute(text("DROP INDEX ux_snapshots_asset_date"))
         connection.execute(text("DROP INDEX ux_snapshots_liability_date"))
         connection.execute(text("ALTER TABLE snapshots DROP COLUMN derived"))
+        connection.execute(text("DROP TABLE deposits"))
         connection.execute(text("INSERT INTO liabilities (id, name, type) VALUES (1, 'Visa', 'Carte')"))
         for snapshot_id, day, amount in snapshots:
             connection.execute(text("INSERT INTO snapshots (id, date, liability_id, amount) VALUES (:i, :d, 1, :a)"),
