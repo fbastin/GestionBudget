@@ -667,12 +667,15 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['Date', 'Description', 'Amount', 'Interest', 'Account', 'Type'])
-    
+    banks = {b.id: b for b in db.query(models.Bank).all()}
+    assets = db.query(models.Asset).all()
+
+    # A bank account is written like a side of a deposit, "Bank: account" or "Bank" (see csv_account)
     expenses = db.query(models.Expense).all()
     for e in expenses:
         account_name = ""
-        if e.bank:
-            account_name = f"Banque: {e.bank.name}"
+        if e.bank or e.asset:
+            account_name = f"Banque: {csv_account(e.bank, e.asset, assets)}"
         elif e.credit:
             account_name = f"Crédit: {e.credit.name}"
         elif e.liability:
@@ -681,7 +684,7 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
         
     payments = db.query(models.Payment).all()
     for p in payments:
-        bank_name = p.bank.name if p.bank else "Cash"
+        bank_name = csv_account(p.bank, p.asset, assets) if p.bank or p.asset else "Cash"
         credit_name = "N/A"
         if p.credit:
             credit_name = p.credit.name
@@ -691,8 +694,6 @@ def export_expenses_csv(db: Session = Depends(database.get_db)):
         writer.writerow([p.date, p.description, p.amount, p.interest, account_name, 'Remboursement'])
 
     # Deposits: "source -> account", each side as "Bank: account", "Bank" or Extérieur
-    banks = {b.id: b for b in db.query(models.Bank).all()}
-    assets = db.query(models.Asset).all()
     for d in db.query(models.Deposit).all():
         source = csv_account(banks.get(d.source_bank_id), next((a for a in assets if a.id == d.source_asset_id), None), assets)
         target = csv_account(banks.get(d.bank_id), next((a for a in assets if a.id == d.asset_id), None), assets)
@@ -743,15 +744,14 @@ def count_recorded_deposits(db: Session, date, description: str, amount: float, 
     )
 
 def parse_csv_account(db: Session, account: str, is_payment: bool):
-    """(bank_id, credit_id, liability_id) from the Account column written by the export."""
-    bank_id = credit_id = liability_id = None
+    """(bank_id, asset_id, credit_id, liability_id) from the Account column written by the export. A bank account
+    is "Bank: account" or "Bank" alone, as in the exports made before the account was written."""
+    bank_id = asset_id = credit_id = liability_id = None
     if is_payment:
-        # Format: "BankName -> TargetName"
+        # Format: "BankName -> TargetName", or "Bank: account -> TargetName"
         if " -> " in account:
             bank_part, target_part = account.split(" -> ", 1)
-            bank = db.query(models.Bank).filter(models.Bank.name == bank_part.strip()).first()
-            if bank:
-                bank_id = bank.id
+            bank_id, asset_id = parse_csv_side(db, bank_part)
             credit = db.query(models.Credit).filter(models.Credit.name == target_part.strip()).first()
             if credit:
                 credit_id = credit.id
@@ -760,9 +760,7 @@ def parse_csv_account(db: Session, account: str, is_payment: bool):
                 if liability:
                     liability_id = liability.id
     elif account.startswith("Banque: "):
-        bank = db.query(models.Bank).filter(models.Bank.name == account.replace("Banque: ", "").strip()).first()
-        if bank:
-            bank_id = bank.id
+        bank_id, asset_id = parse_csv_side(db, account.removeprefix("Banque: "))
     elif account.startswith("Crédit: "):
         credit = db.query(models.Credit).filter(models.Credit.name == account.replace("Crédit: ", "").strip()).first()
         if credit:
@@ -771,14 +769,16 @@ def parse_csv_account(db: Session, account: str, is_payment: bool):
         liability = db.query(models.Liability).filter(models.Liability.name == account.replace("Dette: ", "").strip()).first()
         if liability:
             liability_id = liability.id
-    return bank_id, credit_id, liability_id
+    return bank_id, asset_id, credit_id, liability_id
 
-def count_recorded_transactions(db: Session, model, date, description: str, amount: float, interest: float, bank_id, liability_id) -> int:
-    """Transactions already recorded with these values, compared the way the CSV export writes them."""
+def count_recorded_transactions(db: Session, model, date, description: str, amount: float, interest: float, bank_id, asset_id, liability_id) -> int:
+    """Transactions already recorded with these values, compared the way the CSV export writes them. Without an
+    account (an export made before the account was written), any account of the bank matches."""
     return sum(
         1 for t in db.query(model).filter(model.date == date).all()
         if (t.description or '').strip() == description and round(t.amount, 2) == amount
         and round(getattr(t, 'interest', 0) or 0, 2) == interest and t.bank_id == bank_id
+        and (asset_id is None or t.asset_id == asset_id)
         and resolve_liability_id(db, t.liability_id, t.credit_id) == liability_id
     )
 
@@ -823,10 +823,10 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
                 continue  # the account receiving it is unknown here
             key = (models.Deposit, date_val, description, round(amount_val, 2), *deposit_accounts)
         else:
-            bank_id, credit_id, liability_id = parse_csv_account(db, account, is_payment)
+            bank_id, asset_id, credit_id, liability_id = parse_csv_account(db, account, is_payment)
             model = models.Payment if is_payment else models.Expense
             key = (model, date_val, description, round(amount_val, 2), round(interest_val, 2) if is_payment else 0,
-                   bank_id, resolve_liability_id(db, liability_id, credit_id))
+                   bank_id, asset_id, resolve_liability_id(db, liability_id, credit_id))
 
         # Skip transactions already recorded (e.g. a file imported twice). Identical rows of the file are
         # legitimate (two coffees the same day), so only as many occurrences as already recorded are skipped.
@@ -847,7 +847,8 @@ async def import_expenses_csv(file: UploadFile = File(...), db: Session = Depend
             count += 1
             continue
 
-        fields = dict(date=date_val, description=description, amount=amount_val, bank_id=bank_id, credit_id=credit_id, liability_id=liability_id)
+        fields = dict(date=date_val, description=description, amount=amount_val, bank_id=bank_id, asset_id=asset_id,
+                      credit_id=credit_id, liability_id=liability_id)
         if is_payment:
             transaction = models.Payment(interest=interest_val, **fields)
             db.add(transaction)

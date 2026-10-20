@@ -118,7 +118,7 @@ def test_editing_a_computed_balance_makes_it_an_entered_one(client, accounts):
 
 def test_reimporting_the_export_changes_nothing(client, accounts):
     create(client, "/expenses", date="2026-03-01", description="Épicerie, marché", amount=18.1, credit_id=accounts["credit"])
-    # Payment on the debt itself while a credit has the same name: the export writes "Banque -> Visa" either way
+    # Payment on the debt itself while a credit has the same name: the export writes "Banque: Compte -> Visa" either way
     create(client, "/payments", date="2026-04-01", description="Paiement", amount=300, interest=12.5,
            liability_id=accounts["debt"], **from_account(accounts))
     before = (balances(client, "liabilities", accounts["debt"]), balances(client, "assets", accounts["account"]))
@@ -128,6 +128,31 @@ def test_reimporting_the_export_changes_nothing(client, accounts):
     assert message == "0 transaction(s) importée(s), 2 doublon(s) ignoré(s)."
     assert (balances(client, "liabilities", accounts["debt"]), balances(client, "assets", accounts["account"])) == before
     assert len(client.get("/expenses").json()) == 1 and len(client.get("/payments").json()) == 1
+
+
+def test_the_csv_export_keeps_the_account_of_expenses_and_payments(client, accounts):
+    # A second account at the same bank, which a bank name alone would not designate
+    savings = create(client, "/assets", name="Épargne", type="Épargne", bank_id=accounts["bank"])["id"]
+    create(client, "/snapshots", date="2026-01-01", amount=2000, asset_id=savings)
+    on_savings = {"bank_id": accounts["bank"], "asset_id": savings}
+    create(client, "/expenses", date="2026-02-01", description="Assurance", amount=170, **on_savings)
+    create(client, "/payments", date="2026-03-01", description="Paiement", amount=300, credit_id=accounts["credit"], **on_savings)
+    exported = client.get("/export/expenses/csv").text
+    assert "Banque: Banque: Épargne,Dépense" in exported and "Banque: Épargne -> Visa" in exported
+    before = balances(client, "assets", savings)
+
+    # Imported after deletion: recreated on the same account, with the same effect
+    client.delete(f"/expenses/{client.get('/expenses').json()[0]['id']}")
+    client.delete(f"/payments/{client.get('/payments').json()[0]['id']}")
+    assert upload(client, "/import/expenses/csv", exported) == "2 transaction(s) importée(s), 0 doublon(s) ignoré(s)."
+    assert [(t["bank_id"], t["asset_id"]) for t in client.get("/expenses").json() + client.get("/payments").json()] == [
+        (accounts["bank"], savings)] * 2
+    assert balances(client, "assets", savings) == before
+    assert balances(client, "assets", accounts["account"]) == {"2026-01-01": 5000}
+
+    # An export made before the account was written, with the bank alone: already there
+    old = CSV_HEADER + "2026-02-01,Assurance,170,0,Banque: Banque,Dépense\n2026-03-01,Paiement,300,0,Banque -> Visa,Remboursement\n"
+    assert upload(client, "/import/expenses/csv", old) == "0 transaction(s) importée(s), 2 doublon(s) ignoré(s)."
 
 
 def test_identical_rows_are_skipped_only_as_often_as_already_recorded(client, accounts):
