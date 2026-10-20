@@ -19,28 +19,40 @@ import {
 } from "../api";
 import { todayLocal } from "../date";
 import type { Asset, Bank, Credit, Expense, Liability, Payment } from "../types";
-import { 
-  Receipt, 
-  Plus, 
-  Trash2, 
-  Calendar, 
-  Tag, 
-  Wallet, 
-  Download, 
-  Upload, 
-  Loader2,
-  AlertCircle,
-  Pencil,
-  X,
-  CreditCard,
-  TrendingDown
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { money } from "../format";
 import { accountLabelById } from "../accounts";
-import { AccountOptions } from "../components/AccountOptions";
+import { AccountOptions, DebtOptions } from "../components/AccountOptions";
+import { PaymentFields } from "../components/PaymentFields";
+import { paymentColumns } from "../components/paymentColumns";
+import {
+  AccountBadge,
+  CsvButtons,
+  ErrorNotice,
+  Field,
+  fieldControl,
+  FormBand,
+  History,
+  HistoryRow,
+  NoAccount,
+  Page,
+  PageHeader,
+  RowNote,
+  SubmitButton,
+  type AccountKind
+} from "../components/TransactionLayout";
 
 // Expenses and payments shown in a single list
 type Transaction = (Expense & { type: "expense" }) | (Payment & { type: "payment" });
+
+// Columns of an expense's fields; a payment's are paymentColumns
+const expenseColumns = {
+  date: "col-span-6 @2xl:col-span-3 @5xl:col-span-2",
+  description: "col-span-12 @2xl:col-span-6 @5xl:col-span-3",
+  amount: "col-span-6 @2xl:col-span-3 @5xl:col-span-2",
+  account: "col-span-12 @2xl:col-span-8 @5xl:col-span-3",
+  submit: "col-span-12 @2xl:col-span-4 @5xl:col-span-2",
+};
 
 export function Depenses() {
   const [expenses, setExpenses] = useState<Transaction[]>([]);
@@ -306,321 +318,147 @@ export function Depenses() {
     );
   }
 
+  const { isPayment } = newExpense;
+
+  // What a transaction is charged to; a payment goes from an account to a debt
+  const accountOf = (item: Transaction): { kind: AccountKind; label: string } | null => {
+    const bankName = item.asset_id
+      ? accountLabelById(item.asset_id, assets)
+      : item.bank_id ? banks.find(b => b.id === item.bank_id)?.name || "" : "";
+    if (item.type === "payment") {
+      const debtName = item.credit_id
+        ? credits.find(c => c.id === item.credit_id)?.name
+        : liabilities.find(l => l.id === item.liability_id)?.name;
+      return { kind: "payment", label: `${bankName || "Cash"} → ${debtName}` };
+    }
+    if (bankName) return { kind: "bank", label: bankName };
+    if (item.credit_id) return { kind: "credit", label: credits.find(c => c.id === item.credit_id)?.name || "" };
+    if (item.liability_id) return { kind: "debt", label: liabilities.find(l => l.id === item.liability_id)?.name || "" };
+    return null;
+  };
+
+  const columns = isPayment ? paymentColumns : expenseColumns;
+
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex justify-between items-center mb-5">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dépenses</h1>
-          <p className="text-slate-500 mt-1">Suivez vos dépenses et remboursements de dettes</p>
-        </div>
-        <div className="flex gap-3">
-          <label title="Dépenses, paiements et entrées, au format de l'export" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer shadow-sm">
-            <Upload size={18} />
-            <span>Importer CSV</span>
-            <input type="file" className="hidden" accept=".csv" onChange={handleImport} />
-          </label>
-          <button 
-            onClick={() => exportExpensesCSV()}
-            title="Dépenses, paiements et entrées"
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            <Download size={18} />
-            <span>Exporter CSV</span>
-          </button>
-        </div>
-      </div>
+    <Page>
+      <PageHeader title="Dépenses" subtitle="Dépenses et remboursements de dettes">
+        <CsvButtons
+          onImport={handleImport}
+          onExport={() => exportExpensesCSV()}
+          importTitle="Dépenses, paiements et entrées, au format de l'export"
+          exportTitle="Dépenses, paiements et entrées"
+        />
+      </PageHeader>
+      <ErrorNotice message={error} />
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600">
-          <AlertCircle size={20} />
-          <p>{error}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Formulaire d'ajout/modification */}
-        <div className="lg:col-span-1">
-          {/* Stays in view while the history scrolls; scrolls itself if taller than the screen */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
-            <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {editingId ? <Pencil className="text-orange-500" size={20} /> : <Plus className="text-blue-600" size={20} />}
-                {editingId ? (isEditingPayment ? "Modifier Remboursement" : "Modifier Dépense") : "Nouvelle Transaction"}
-              </div>
-              {editingId && (
-                <button onClick={cancelEdit} className="text-slate-400 hover:text-slate-600 transition-colors">
-                  <X size={20} />
-                </button>
-              )}
-            </h2>
-            <form onSubmit={handleAddExpense} className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+      <FormBand
+        onSubmit={handleAddExpense}
+        editing={editingId ? `${isEditingPayment ? "payment" : "expense"}-${editingId}` : null}
+        onCancel={cancelEdit}
+        toolbar={
+          <div role="radiogroup" aria-label="Type de transaction" className="flex gap-0.5 p-[3px] h-10 bg-white border border-slate-200 rounded-lg">
+            {([[false, "Dépense"], [true, "Remboursement de dette"]] as const).map(([payment, text]) => (
+              <label key={text} className="relative flex">
                 <input
-                  type="checkbox"
-                  id="isPayment"
-                  checked={newExpense.isPayment}
-                  onChange={(e) => setNewExpense({ ...newExpense, isPayment: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  type="radio"
+                  name="transaction-type"
+                  checked={isPayment === payment}
+                  onChange={() => setNewExpense({ ...newExpense, isPayment: payment })}
+                  className="peer sr-only"
                 />
-                <label htmlFor="isPayment" className="text-sm font-bold text-slate-700 cursor-pointer">
-                  Remboursement de dette ?
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date</label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="date"
-                    required
-                    value={newExpense.date}
-                    onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
-                <div className="relative">
-                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="text"
-                    required
-                    placeholder={newExpense.isPayment ? "ex: Paiement hypothèque..." : "ex: Courses, Loyer..."}
-                    value={newExpense.description}
-                    onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Montant Total</label>
-                <div className="relative">
-                  <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                    value={newExpense.amount}
-                    onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              {newExpense.isPayment && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                    Portion Intérêt (optionnel)
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Non déduite de la dette</span>
-                  </label>
-                  <div className="relative">
-                    <TrendingDown className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={newExpense.interest}
-                      onChange={(e) => setNewExpense({ ...newExpense, interest: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {newExpense.isPayment ? (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Payé de (Source)</label>
-                    <div className="relative">
-                      <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select
-                        value={newExpense.bankId}
-                        onChange={(e) => setNewExpense({ ...newExpense, bankId: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
-                      >
-                        <option value="">Sélectionner un compte (optionnel)</option>
-                        <AccountOptions banks={banks} assets={assets} />
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dette remboursée (Cible)</label>
-                    <div className="relative">
-                      <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                      <select
-                        required
-                        value={newExpense.creditId}
-                        onChange={(e) => setNewExpense({ ...newExpense, creditId: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
-                      >
-                        <option value="">Sélectionner une dette</option>
-                        <optgroup label="Comptes de Crédit">
-                          {credits.map(c => (
-                            <option key={`credit-${c.id}`} value={`credit:${c.id}`}>{c.name}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Toutes les Dettes">
-                          {liabilities.map(l => (
-                            <option key={`liability-${l.id}`} value={`liability:${l.id}`}>{l.name}</option>
-                          ))}
-                        </optgroup>
-                      </select>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Compte</label>
-                  <div className="relative">
-                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <select
-                      value={newExpense.accountId}
-                      onChange={(e) => setNewExpense({ ...newExpense, accountId: e.target.value })}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
-                    >
-                      <option value="">Sélectionner un compte (optionnel)</option>
-                      <AccountOptions banks={banks} assets={assets} />
-                      <optgroup label="Crédits">
-                        {credits.map(c => (
-                          <option key={`credit-${c.id}`} value={`credit:${c.id}`}>{c.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Dettes">
-                        {liabilities.map(l => (
-                          <option key={`liability-${l.id}`} value={`liability:${l.id}`}>{l.name}</option>
-                        ))}
-                      </optgroup>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={saving}
-                className={`w-full py-3 ${editingId ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white rounded-xl font-bold transition-colors shadow-lg flex items-center justify-center gap-2 mt-4 disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {editingId ? <Pencil size={20} /> : <Plus size={20} />}
-                {editingId ? "Enregistrer les modifications" : "Ajouter"}
-              </button>
-            </form>
+                <span className="grid place-items-center px-3 rounded-md text-sm text-slate-600 cursor-pointer hover:text-blue-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:hover:text-white peer-checked:font-bold peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500">
+                  {text}
+                </span>
+              </label>
+            ))}
           </div>
-        </div>
+        }
+      >
+        <Field id="tx-date" label="Date" className={columns.date}>
+          <input
+            id="tx-date"
+            type="date"
+            required
+            value={newExpense.date}
+            onChange={(e) => setNewExpense({ ...newExpense, date: e.target.value })}
+            className={fieldControl}
+          />
+        </Field>
+        <Field id="tx-description" label="Description" className={columns.description}>
+          <input
+            id="tx-description"
+            type="text"
+            required
+            placeholder={isPayment ? "ex. : Paiement hypothèque" : "ex. : Épicerie, Hydro-Québec"}
+            value={newExpense.description}
+            onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+            className={fieldControl}
+          />
+        </Field>
+        <Field id="tx-amount" label="Montant" className={columns.amount}>
+          <input
+            id="tx-amount"
+            type="number"
+            step="0.01"
+            required
+            placeholder="0.00"
+            value={newExpense.amount}
+            onChange={(e) => setNewExpense({ ...newExpense, amount: e.target.value })}
+            className={fieldControl}
+          />
+        </Field>
 
-        {/* Liste des dépenses */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-50">
-              <h2 className="text-lg font-bold text-slate-900">Historique des transactions</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-4 py-2.5">Date</th>
-                    <th className="px-4 py-2.5">Description</th>
-                    <th className="px-4 py-2.5">Compte</th>
-                    <th className="px-4 py-2.5 text-right">Montant</th>
-                    <th className="px-4 py-2.5"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {expenses.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">
-                        Aucune transaction enregistrée
-                      </td>
-                    </tr>
-                  ) : (
-                    expenses.map((item) => {
-                      let account: string;
-                      if (item.type === 'payment') {
-                        let bankName = "";
-                        if (item.asset_id) {
-                          bankName = accountLabelById(item.asset_id, assets);
-                        } else if (item.bank_id) {
-                          bankName = banks.find(b => b.id === item.bank_id)?.name || "";
-                        }
+        {isPayment ? (
+          <PaymentFields
+            value={newExpense}
+            onChange={(change) => setNewExpense({ ...newExpense, ...change })}
+            banks={banks}
+            assets={assets}
+            credits={credits}
+            liabilities={liabilities}
+          />
+        ) : (
+          <Field id="tx-account" label="Compte" className={expenseColumns.account}>
+            <select
+              id="tx-account"
+              value={newExpense.accountId}
+              onChange={(e) => setNewExpense({ ...newExpense, accountId: e.target.value })}
+              className={fieldControl}
+            >
+              <option value="">Aucun compte</option>
+              <AccountOptions banks={banks} assets={assets} />
+              <DebtOptions credits={credits} liabilities={liabilities} />
+            </select>
+          </Field>
+        )}
 
-                        const creditName = item.credit_id 
-                          ? credits.find(c => c.id === item.credit_id)?.name 
-                          : liabilities.find(l => l.id === item.liability_id)?.name;
-                        account = `${bankName || 'Cash'} → ${creditName}`;
-                      } else {
-                        if (item.asset_id) {
-                          account = accountLabelById(item.asset_id, assets);
-                        } else if (item.bank_id) {
-                          account = banks.find(b => b.id === item.bank_id)?.name || "";
-                        } else if (item.credit_id) {
-                          account = credits.find(c => c.id === item.credit_id)?.name || "";
-                        } else if (item.liability_id) {
-                          account = liabilities.find(l => l.id === item.liability_id)?.name || "";
-                        } else {
-                          account = "N/A";
-                        }
-                      }
-                      
-                      return (
-                        <tr key={`${item.type}-${item.id}`} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-4 py-2.5 text-slate-600 text-sm">{item.date}</td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900">{item.description}</span>
-                              {item.type === 'payment' && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Remboursement</span>
-                                  {item.interest > 0 && (
-                                    <span className="text-[10px] font-bold text-orange-500 uppercase tracking-tight">
-                                      dont {money(item.interest)} d'intérêt
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            {account !== 'N/A' ? (
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.type === 'payment' ? 'bg-blue-100 text-blue-700' : (item.bank_id ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700')}`}>
-                                {account}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-xs italic">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <span className={`font-bold ${item.type === 'payment' ? 'text-blue-600' : 'text-slate-900'}`}>
-                              {money(item.amount)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right">
-                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              >
-                                <Pencil size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        <SubmitButton editing={!!editingId} saving={saving} className={columns.submit} />
+      </FormBand>
+
+      <History count={expenses.length} noun="transaction" accountHeader="Compte" emptyText="Aucune transaction enregistrée">
+        {expenses.map((item) => {
+          const account = accountOf(item);
+          return (
+            <HistoryRow
+              key={`${item.type}-${item.id}`}
+              date={item.date}
+              description={item.description}
+              note={item.type === "payment" && (
+                <RowNote className="text-blue-500">
+                  Remboursement
+                  {item.interest > 0 && <span className="text-orange-500"> · dont {money(item.interest)} d'intérêt</span>}
+                </RowNote>
+              )}
+              account={account ? <AccountBadge kind={account.kind} label={account.label} /> : <NoAccount />}
+              amount={money(item.amount)}
+              amountClassName={item.type === "payment" ? "text-blue-600" : "text-slate-900"}
+              editing={editingId === item.id && isEditingPayment === (item.type === "payment")}
+              onEdit={() => handleEdit(item)}
+              onDelete={() => handleDelete(item)}
+            />
+          );
+        })}
+      </History>
+    </Page>
   );
 }

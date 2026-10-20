@@ -1,5 +1,5 @@
 import { accountLabel } from "../accounts";
-import type { Asset, Bank } from "../types";
+import type { Asset, Bank, Credit, Liability } from "../types";
 
 /** Options of the account selects: the accounts of each bank, or the bank itself when it has none.
  * The groups must stay directly under the select: an option in an optgroup nested in another one is left out
@@ -20,6 +20,24 @@ export function AccountOptions({ banks, assets }: { banks: Bank[]; assets: Asset
           </optgroup>
         );
       })}
+    </>
+  );
+}
+
+/** Options of the debt selects: the credits, then every debt. */
+export function DebtOptions({ credits, liabilities }: { credits: Credit[]; liabilities: Liability[] }) {
+  return (
+    <>
+      <optgroup label="Crédits">
+        {credits.map((c) => (
+          <option key={`credit-${c.id}`} value={`credit:${c.id}`}>{c.name}</option>
+        ))}
+      </optgroup>
+      <optgroup label="Dettes">
+        {liabilities.map((l) => (
+          <option key={`liability-${l.id}`} value={`liability:${l.id}`}>{l.name}</option>
+        ))}
+      </optgroup>
     </>
   );
 }
