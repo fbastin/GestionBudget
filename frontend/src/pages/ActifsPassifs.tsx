@@ -46,6 +46,7 @@ import {
 import { money } from "../format";
 import { accountLabel } from "../accounts";
 import { RowActions } from "../components/RowActions";
+import { fieldControl } from "../components/TransactionLayout";
 
 interface DashboardData {
   total_assets: number;
@@ -208,6 +209,20 @@ export function ActifsPassifs() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Debts and assets share the fields of their add forms, and those of their edit forms: opening the form of one
+  // closes the other's, so that a debt never receives what was typed or loaded for an asset, or conversely
+  const openAddForm = (kind: "liability" | "asset") => {
+    if (kind === "liability" ? isAddingAsset : isAddingLiability) {
+      setNewItemName("");
+      setNewItemType("");
+      setNewItemLocation("");
+      setNewItemBankId("");
+      setNewItemAmount("");
+    }
+    setIsAddingLiability(kind === "liability");
+    setIsAddingAsset(kind === "asset");
+  };
 
   const handleUpdateLiability = async (id: number) => {
     try {
@@ -527,7 +542,7 @@ export function ActifsPassifs() {
               Liste des Dettes
             </h2>
             <button 
-              onClick={() => setIsAddingLiability(true)}
+              onClick={() => openAddForm("liability")}
               aria-label="Ajouter une dette"
               className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
             >
@@ -547,7 +562,7 @@ export function ActifsPassifs() {
                 <input
                   type="text"
                   placeholder="Nom"
-                  className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className={fieldControl}
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddLiability()}
@@ -556,7 +571,7 @@ export function ActifsPassifs() {
                 <input
                   type="text"
                   placeholder="Type (ex: Prêt)"
-                  className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className={fieldControl}
                   value={newItemType}
                   onChange={(e) => setNewItemType(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddLiability()}
@@ -565,7 +580,7 @@ export function ActifsPassifs() {
               <input
                 type="number"
                 placeholder="Montant initial ($)"
-                className="w-full rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className={fieldControl}
                 value={newItemAmount}
                 onChange={(e) => setNewItemAmount(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddLiability()}
@@ -602,7 +617,7 @@ export function ActifsPassifs() {
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        className="rounded-lg border-slate-200 text-sm"
+                        className={fieldControl}
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleUpdateLiability(l.id)}
@@ -611,7 +626,7 @@ export function ActifsPassifs() {
                       />
                       <input
                         type="text"
-                        className="rounded-lg border-slate-200 text-sm"
+                        className={fieldControl}
                         value={editType}
                         onChange={(e) => setEditType(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleUpdateLiability(l.id)}
@@ -622,7 +637,7 @@ export function ActifsPassifs() {
                       <div className="relative">
                         <input
                           type="number"
-                          className="w-full rounded-lg border-slate-200 text-sm pr-8 font-bold"
+                          className={`${fieldControl} pr-8 font-bold`}
                           value={editAmount}
                           onChange={(e) => setEditAmount(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleUpdateLiability(l.id)}
@@ -664,6 +679,7 @@ export function ActifsPassifs() {
                   </span>
                   <RowActions
                     onEdit={() => {
+                      setEditingAssetMetadataId(null);
                       setEditingMetadataId(l.id);
                       setEditName(l.name);
                       setEditType(l.type);
@@ -684,7 +700,7 @@ export function ActifsPassifs() {
               Mes Actifs
             </h2>
             <button 
-              onClick={() => setIsAddingAsset(true)}
+              onClick={() => openAddForm("asset")}
               aria-label="Ajouter un actif"
               className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
             >
@@ -704,7 +720,7 @@ export function ActifsPassifs() {
                 <input
                   type="text"
                   placeholder="Nom"
-                  className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  className={fieldControl}
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
@@ -714,7 +730,7 @@ export function ActifsPassifs() {
                   <input
                     type="text"
                     placeholder="Type (ex: Actions)"
-                    className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className={fieldControl}
                     value={newItemType}
                     onChange={(e) => setNewItemType(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
@@ -722,7 +738,7 @@ export function ActifsPassifs() {
                   <input
                     type="text"
                     placeholder="Lieu (ex: CELI)"
-                    className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className={fieldControl}
                     value={newItemLocation}
                     onChange={(e) => setNewItemLocation(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
@@ -732,7 +748,7 @@ export function ActifsPassifs() {
                   <div className="flex items-center gap-2">
                     <Building2 size={18} className="text-slate-400" />
                     <select
-                      className="flex-1 rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className={`${fieldControl} flex-1 min-w-0`}
                       value={newItemBankId}
                       onChange={(e) => setNewItemBankId(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
@@ -746,7 +762,7 @@ export function ActifsPassifs() {
                   <input
                     type="number"
                     placeholder="Solde initial ($)"
-                    className="rounded-lg border-slate-200 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className={fieldControl}
                     value={newItemAmount}
                     onChange={(e) => setNewItemAmount(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddAsset()}
@@ -783,7 +799,7 @@ export function ActifsPassifs() {
                     <div className="grid grid-cols-1 gap-2">
                       <input
                         type="text"
-                        className="rounded-lg border-slate-200 text-sm"
+                        className={fieldControl}
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
@@ -793,7 +809,7 @@ export function ActifsPassifs() {
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="text"
-                          className="rounded-lg border-slate-200 text-sm"
+                          className={fieldControl}
                           value={editType}
                           onChange={(e) => setEditType(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
@@ -801,7 +817,7 @@ export function ActifsPassifs() {
                         />
                         <input
                           type="text"
-                          className="rounded-lg border-slate-200 text-sm"
+                          className={fieldControl}
                           value={editLocation}
                           onChange={(e) => setEditLocation(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
@@ -810,7 +826,7 @@ export function ActifsPassifs() {
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <select
-                          className="rounded-lg border-slate-200 text-sm"
+                          className={fieldControl}
                           value={editBankId}
                           onChange={(e) => setEditBankId(e.target.value)}
                         >
@@ -821,7 +837,7 @@ export function ActifsPassifs() {
                         </select>
                         <input
                           type="number"
-                          className="rounded-lg border-slate-200 text-sm"
+                          className={fieldControl}
                           value={editFixedValue}
                           onChange={(e) => setEditFixedValue(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
@@ -831,7 +847,7 @@ export function ActifsPassifs() {
                       <div className="relative">
                         <input
                           type="number"
-                          className="w-full rounded-lg border-slate-200 text-sm pr-8 font-bold"
+                          className={`${fieldControl} pr-8 font-bold`}
                           value={editAmount}
                           onChange={(e) => setEditAmount(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleUpdateAsset(a.id)}
@@ -886,6 +902,7 @@ export function ActifsPassifs() {
                   </span>
                   <RowActions
                     onEdit={() => {
+                      setEditingMetadataId(null);
                       setEditingAssetMetadataId(a.id);
                       setEditName(a.name);
                       setEditType(a.type);
