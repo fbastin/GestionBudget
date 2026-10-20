@@ -30,7 +30,6 @@ import {
   X, 
   Building2, 
   Upload, 
-  Edit2, 
   ChevronRight, 
   History as HistoryIcon,
   TriangleAlert
@@ -46,6 +45,7 @@ import {
 } from "recharts";
 import { money } from "../format";
 import { accountLabel } from "../accounts";
+import { RowActions } from "../components/RowActions";
 
 interface DashboardData {
   total_assets: number;
@@ -521,16 +521,17 @@ export function ActifsPassifs() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <TrendingDown className="text-rose-500" size={24} />
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <TrendingDown className="text-rose-500" size={22} />
               Liste des Dettes
             </h2>
             <button 
               onClick={() => setIsAddingLiability(true)}
-              className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
+              aria-label="Ajouter une dette"
+              className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors"
             >
-              <Plus size={20} />
+              <Plus size={18} />
             </button>
           </div>
 
@@ -578,14 +579,15 @@ export function ActifsPassifs() {
             </div>
           )}
 
-          <div className="space-y-3">
+          {/* One row per item, separated by a rule; the edit form of an item takes its place */}
+          <div className="divide-y divide-slate-100">
             {liabilities.map((l) => {
               const snapshots = [...l.snapshots].filter(s => s.date <= todayStr).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.id - b.id);
               const currentAmount = snapshots[snapshots.length - 1]?.amount || 0;
               
               if (editingMetadataId === l.id) {
                 return (
-                  <div key={l.id} className="p-4 rounded-xl border-2 border-rose-200 bg-rose-50 space-y-3">
+                  <div key={l.id} className="my-2 p-4 rounded-xl border-2 border-rose-200 bg-rose-50 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-rose-600 uppercase">Modifier la dette</span>
                       <div className="flex gap-2">
@@ -640,51 +642,35 @@ export function ActifsPassifs() {
               }
 
               return (
-                <div key={l.id} className="p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-all">
-                      <button 
-                        onClick={() => handleDeleteLiability(l.id)}
-                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-md"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setEditingMetadataId(l.id);
-                          setEditName(l.name);
-                          setEditType(l.type);
-                          setEditAmount(currentAmount.toString());
-                        }}
-                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-md"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-800">{l.name}</div>
-                      <div className="text-xs text-slate-400 uppercase font-semibold">{l.type}</div>
-                      {l.credits && l.credits.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {l.credits.map((c, i) => (
-                            <Link 
-                              key={i} 
-                              to="/credits" 
-                              className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100 font-bold hover:bg-rose-100 flex items-center gap-0.5"
-                            >
-                              {c.name}
-                              <ChevronRight size={8} />
-                            </Link>
-                          ))}
-                        </div>
-                      )}
+                <div key={l.id} className="group flex items-center gap-3 px-2 py-2 hover:bg-slate-50 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-800">{l.name}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400 uppercase font-semibold">
+                      <span>{l.type}</span>
+                      {l.credits?.map((c, i) => (
+                        <Link 
+                          key={i} 
+                          to="/credits" 
+                          className="normal-case text-[10px] bg-rose-50 text-rose-600 px-1.5 rounded border border-rose-100 font-bold hover:bg-rose-100 flex items-center gap-0.5"
+                        >
+                          {c.name}
+                          <ChevronRight size={8} />
+                        </Link>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-rose-600 text-lg">
-                      {money(currentAmount)}
-                    </span>
-                  </div>
+                  <span className="font-bold text-rose-600 tabular-nums whitespace-nowrap">
+                    {money(currentAmount)}
+                  </span>
+                  <RowActions
+                    onEdit={() => {
+                      setEditingMetadataId(l.id);
+                      setEditName(l.name);
+                      setEditType(l.type);
+                      setEditAmount(currentAmount.toString());
+                    }}
+                    onDelete={() => handleDeleteLiability(l.id)}
+                  />
                 </div>
               );
             })}
@@ -692,16 +678,17 @@ export function ActifsPassifs() {
         </div>
 
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Landmark className="text-emerald-500" size={24} />
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Landmark className="text-emerald-500" size={22} />
               Mes Actifs
             </h2>
             <button 
               onClick={() => setIsAddingAsset(true)}
-              className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+              aria-label="Ajouter un actif"
+              className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
             >
-              <Plus size={20} />
+              <Plus size={18} />
             </button>
           </div>
 
@@ -775,13 +762,13 @@ export function ActifsPassifs() {
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="divide-y divide-slate-100">
             {assets.map((a) => {
               const currentAmount = assetAmount(a);
               
               if (editingAssetMetadataId === a.id) {
                 return (
-                  <div key={a.id} className="p-4 rounded-xl border-2 border-emerald-200 bg-emerald-50 space-y-3">
+                  <div key={a.id} className="my-2 p-4 rounded-xl border-2 border-emerald-200 bg-emerald-50 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-emerald-600 uppercase">Modifier l'actif</span>
                       <div className="flex gap-2">
@@ -864,64 +851,51 @@ export function ActifsPassifs() {
               }
 
               return (
-                <div key={a.id} className="p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-all">
-                      <button 
-                        onClick={() => handleDeleteAsset(a.id)}
-                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-md"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setEditingAssetMetadataId(a.id);
-                          setEditName(a.name);
-                          setEditType(a.type);
-                          setEditLocation(a.location || "");
-                          setEditBankId(a.bank_id?.toString() || "");
-                          setEditFixedValue(a.details?.value?.toString() || "");
-                          setEditAmount(currentAmount.toString());
-                        }}
-                        className="p-1.5 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-md"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-800">{a.name}</div>
-                      <div className="text-xs text-slate-400 font-semibold mb-1">{a.location} • {a.type}</div>
-                      <div className="flex items-center gap-2">
-                        {a.type === "ETF" || a.type === "Action" ? (
-                           <Link to="/investissements" className="flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline">
-                             Voir titres <ChevronRight size={10} />
-                           </Link>
-                        ) : (
-                          <>
-                            <Building2 size={12} className="text-slate-400" />
-                            <select 
-                              className="text-[10px] border-none bg-slate-100 rounded px-1 py-0.5 focus:ring-0 text-slate-500"
-                              value={a.bank_id || ""}
-                              onChange={(e) => handleLinkBank(a.id, e.target.value)}
-                            >
-                              <option value="">Sans banque</option>
-                              {banks.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                              ))}
-                            </select>
-                          </>
-                        )}
-                      </div>
+                <div key={a.id} className="group flex items-center gap-3 px-2 py-2 hover:bg-slate-50 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-800">{a.name}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400 font-semibold">
+                      <span>{a.location} • {a.type}</span>
+                      {a.type === "ETF" || a.type === "Action" ? (
+                        <Link to="/investissements" className="flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline">
+                          Voir titres <ChevronRight size={10} />
+                        </Link>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 size={12} />
+                          <select 
+                            aria-label="Banque"
+                            className="text-[10px] border-none bg-slate-100 rounded px-1 py-0.5 focus:ring-0 text-slate-500"
+                            value={a.bank_id || ""}
+                            onChange={(e) => handleLinkBank(a.id, e.target.value)}
+                          >
+                            <option value="">Sans banque</option>
+                            {banks.map(b => (
+                              <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                          </select>
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {currentAmount < 0 && (
-                      <span title={NEGATIVE_HINT}><TriangleAlert size={16} className="text-amber-500" /></span>
-                    )}
-                    <span className={`font-bold text-lg ${currentAmount < 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                      {money(currentAmount)}
-                    </span>
-                  </div>
+                  {currentAmount < 0 && (
+                    <span title={NEGATIVE_HINT}><TriangleAlert size={16} className="text-amber-500" /></span>
+                  )}
+                  <span className={`font-bold tabular-nums whitespace-nowrap ${currentAmount < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                    {money(currentAmount)}
+                  </span>
+                  <RowActions
+                    onEdit={() => {
+                      setEditingAssetMetadataId(a.id);
+                      setEditName(a.name);
+                      setEditType(a.type);
+                      setEditLocation(a.location || "");
+                      setEditBankId(a.bank_id?.toString() || "");
+                      setEditFixedValue(a.details?.value?.toString() || "");
+                      setEditAmount(currentAmount.toString());
+                    }}
+                    onDelete={() => handleDeleteAsset(a.id)}
+                  />
                 </div>
               );
             })}
