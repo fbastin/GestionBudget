@@ -26,7 +26,8 @@ import {
   TrendingDown
 } from "lucide-react";
 import { money } from "../format";
-import { accountLabel, accountLabelById } from "../accounts";
+import { accountLabelById } from "../accounts";
+import { AccountOptions } from "../components/AccountOptions";
 
 export function Paiements() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -298,19 +299,7 @@ export function Paiements() {
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all appearance-none"
                   >
                     <option value="">Sélectionner un compte (optionnel)</option>
-                    {banks.map(b => {
-                      const bankAssets = assets.filter(a => a.bank_id === b.id);
-                      if (bankAssets.length === 0) {
-                        return <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>;
-                      }
-                      return (
-                        <optgroup key={`bank-group-${b.id}`} label={b.name}>
-                          {bankAssets.map(a => (
-                            <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
-                          ))}
-                        </optgroup>
-                      );
-                    })}
+                    <AccountOptions banks={banks} assets={assets} />
                   </select>
                 </div>
               </div>

@@ -4,7 +4,8 @@ import { todayLocal } from "../date";
 import type { Asset, Bank, Deposit } from "../types";
 import { BanknoteArrowDown, Plus, Trash2, Calendar, Tag, Wallet, Loader2, AlertCircle, Pencil, X, ArrowRightLeft } from "lucide-react";
 import { money } from "../format";
-import { accountLabel, accountLabelById } from "../accounts";
+import { accountLabelById } from "../accounts";
+import { AccountOptions } from "../components/AccountOptions";
 
 // Today's date when the form is emptied, not when the page was loaded
 const emptyForm = () => ({ date: todayLocal(), description: "", amount: "", account: "", source: "" });
@@ -25,27 +26,6 @@ function accountIds(value: string, assets: Asset[]): { bank_id: number | null; a
     return { bank_id: assets.find((a) => a.id === asset_id)?.bank_id ?? null, asset_id };
   }
   return { bank_id: null, asset_id: null };
-}
-
-/** Options of the account selects: the accounts of each bank, or the bank itself when it has none. */
-function AccountOptions({ banks, assets }: { banks: Bank[]; assets: Asset[] }) {
-  return (
-    <>
-      {banks.map((b) => {
-        const bankAssets = assets.filter((a) => a.bank_id === b.id);
-        if (bankAssets.length === 0) {
-          return <option key={`bank-${b.id}`} value={`bank:${b.id}`}>{b.name}</option>;
-        }
-        return (
-          <optgroup key={`bank-group-${b.id}`} label={b.name}>
-            {bankAssets.map((a) => (
-              <option key={`asset-${a.id}`} value={`asset:${a.id}`}>{accountLabel(a, assets)}</option>
-            ))}
-          </optgroup>
-        );
-      })}
-    </>
-  );
 }
 
 export function Entrees() {
